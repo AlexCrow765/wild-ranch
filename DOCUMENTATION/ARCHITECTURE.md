@@ -1,11 +1,18 @@
-# Wild Ranch – Technical Architecture
+# Wild Ranch – Development Documentation
 
 The design source of truth is `Wild_Ranch_Complete_Design_Notes.docx`. This file records
-*how* the game is built and the implementation decisions made along the way.
+*how* the game is built: architecture (B), the implementation checklist (C), and the
+implementation decisions made along the way.
 
-## Toolchain
+---
+
+## B. Architecture
+
+### Toolchain
 - **Rojo** syncs `SRC/` into Studio (`default.project.json`). Tool versions pinned in `rokit.toml`.
 - Code lives in files. Maps, models and other 3D content are built in Studio.
+- Third-party code is vendored (copied in, pinned to a commit) under `SRC/Server/Vendor/`;
+  licenses in `THIRD_PARTY_LICENSES/`.
 
 | Folder | Roblox location |
 |---|---|
@@ -13,17 +20,19 @@ The design source of truth is `Wild_Ranch_Complete_Design_Notes.docx`. This file
 | `SRC/Server` | `ServerScriptService.Server` |
 | `SRC/Client` | `StarterPlayer.StarterPlayerScripts.Client` |
 
-## Code layout
+### Code layout
 ```
 SRC/Shared/Config/   all tunable numbers (locked values from the design doc; OPEN items marked)
+SRC/Shared/Types/    data shapes shared by client and server (Animal, PlayerData)
 SRC/Shared/Rules/    pure game-rule functions (rolls, income, stamina, taming math)  [Phase 2]
 SRC/Shared/Net/      Remotes – the one list of every RemoteEvent/RemoteFunction
 SRC/Shared/Util/     Signal, Loader
-SRC/Server/Main      boots Services/ ; Services/<Name>Service.luau
+SRC/Server/Main      boots Services/ ; Services/<Name>Service.luau ; Data/ (schema, migrations)
+SRC/Server/Vendor/   ProfileStore
 SRC/Client/Main      boots Controllers/ ; Controllers/<Name>Controller.luau ; UI/ (later)
 ```
 
-## Conventions
+### Conventions
 - One `Script` (server) and one `LocalScript` (client). Everything else is a ModuleScript.
 - Services/controllers are plain tables with optional `LoadOrder`, `Init`, `Start`.
   `Init` = local setup only; `Start` = may use other modules. Modules reach each other by `require`.
@@ -33,22 +42,27 @@ SRC/Client/Main      boots Controllers/ ; Controllers/<Name>Controller.luau ; UI
 - Undecided design values are left **unset** in config with an `OPEN QUESTION` comment, so
   code fails loudly instead of guessing.
 
-## Animal data structure (one shape for an animal's whole life)
-`Shared/Types/Animal.luau` (Phase 1) defines two shapes, so the same traits flow unchanged
+### Animal data structure (one shape for an animal's whole life)
+`Shared/Types/Animal.luau` defines two shapes, so the same traits flow unchanged
 from spawning → taming → inventory → ranch → mount:
 
 | Shape | When it exists | Fields |
 |---|---|---|
-| `AnimalTraits` | Rolled in the run plan at the starting line; never re-rolled | `Species`, `Stars` (0–5), `Variant` (Normal/Gold/Rainbow), `Biome` (biome it was encountered in) |
-| `OwnedAnimal` | Created by the server on Capture & Return Home | all `AnimalTraits` + `Id` (server GUID), `Level`, `Location` (Inventory/Ranch), `CaughtAt` |
+| `AnimalTraits` | Rolled in the run plan at the starting line; never re-rolled | `Species`, `Stars` (0–5), `Variant` (Normal/Gold/Rainbow), `BiomeCaught` |
+| `OwnedAnimal` (saved) | Created by the server on Capture & Return Home | all traits + `Level` (starts at 1), `Placed` (in ranch or not); stored under a server-generated unique id |
 
-- Only the server creates an `OwnedAnimal` or changes its fields.
+- Only the server creates an owned animal or changes its fields.
 - Derived stats (income/sec, max stamina, max level) are **computed** from these fields plus
   Config by `Shared/Rules`, never stored, so a save can't hold a stale or tampered number.
-- The biome is stored as an id (`Biome = "Plains"`); its income multiplier is looked up from
-  `BiomeConfig`. (Recommendation – see decision log.)
+- `BiomeCaught` is a biome id; its income multiplier is looked up from `BiomeConfig`.
 
-## Reproducible run generation
+### Save data
+- ProfileStore with session locking; one profile per player, key `Player_<UserId>`.
+- `SchemaVersion` in every save. On load, migrations upgrade old saves step by step
+  (`Server/Data/Migrations`). A save newer than the server understands is never touched:
+  the player is kicked with a "server outdated" message instead of risking data loss.
+
+### Reproducible run generation
 - At the starting line the server creates a **seed** (`Random.new():NextInteger(1, 2^31 - 1)`).
 - `Shared/Rules/RunPlanner` is a pure function: `RunPlanner.Plan(seed, biome, reachableSegments)`
   → run plan. It uses one `Random.new(seed)` and draws in a fixed order
@@ -56,24 +70,105 @@ from spawning → taming → inventory → ranch → mount:
   Same seed + same inputs + same config = identical plan.
 - The seed is logged with each run and kept in the run session, so any encounter can be
   replayed in Studio with a debug command.
-- Changing draw order or config values changes which plan a seed produces; that is expected.
 
-## Monetization
+### Monetization
 - `MonetizationService` (gem products, Robux, `ProcessReceipt`) stays in the architecture but is
-  **not implemented until Phase 11**, after core gameplay and the coin economy work.
+  **not implemented until Phase 11**, isolated so a purchase failure can never block the core loop.
 
-## Roadmap
-0. Skeleton ✅ · 1. Data foundation · 2. Rules modules · 3. Grey-box course & riding ·
-4. Run generation & encounters · 5. Targeting & lasso · 6. Taming QTE ·
-7. Ranch, inventory, income · 8. Mounts · 9. Biome progression · 10. Journal ·
-11. Failure/retry/monetization · 12. Leaderboards · 13. Polish · Later: quests, stealing
+---
+
+## C. Development Roadmap – Implementation Checklist
+
+Rule: each phase builds a **functional** system and is tested before the next phase starts.
+Visual quality (animations, terrain, models, VFX, sound, UI styling) is **not** part of a
+build phase – it belongs to Phase 13. Phase order is fixed.
+
+### Phase 0 – Project skeleton ✅
+- [x] Rojo project, folder layout, Loader, Remotes list, locked config values
+- [x] Test: Rojo build places every script correctly
+
+### Phase 1 – Data foundation
+- [ ] ProfileStore saving with session locks, versioned schema + migrations
+- [ ] Owned animals: unique id, `{Species, Stars, Variant, BiomeCaught, Level, Placed}`
+- [ ] Coins and gems balances; client receives a read-only copy of its own data
+- [ ] Studio debug commands (give/remove animal, add coins, print profile)
+- [ ] Test: data survives rejoin
+- [ ] Test: **two players** join, get separate profiles, and save independently
+
+### Phase 2 – Rules modules
+- [ ] Star/variant/species rolls with normalization, income, stamina, level caps, taming math
+- [ ] Test: automated tests + large roll simulations match the design doc's odds
+
+### Phase 3 – Grey-box course & riding
+- [ ] Grey-box Plains: starting area, starting line, segments, walls, bush strips (plain parts)
+- [ ] Auto-forward riding with left/right steering on PC, mobile and gamepad
+- [ ] **Temporary test mount** with fixed stamina (removed in Phase 8)
+- [ ] Stamina drains by distance; collapse at 0 ends the run; return to ranch
+- [ ] Test: ride until stamina runs out on all three input types
+- Not in this phase: terrain, real models, animations, effects
+
+### Phase 4 – Run generation & encounters
+- [ ] Reachability → segments generated; seeded RunPlanner; spawn lines; left/right sides
+- [ ] Animals emerge from bushes, flee ahead, can pull ahead
+- [ ] Test: debug view of lines; same seed reproduces the same plan; unreachable segments empty
+- Not in this phase: emergence animation polish, final animal models
+
+### Phase 5 – Targeting & lasso
+- [ ] Yellow/red ring selection and lock rules, dotted outline, stars shown, `???` names
+- [ ] Lasso trigger and biome lasso requirement
+- [ ] Test: lock/unlock behaves exactly as the design doc describes
+
+### Phase 6 – Taming QTE
+- [ ] Server-authoritative meter, random directional prompts, grace, drain, mistake rule
+- [ ] Success popup (Capture & Return Home) and thrown-off failure
+- [ ] Test: all three input types; server rejects forged inputs
+- Not in this phase: prompt art, popup styling
+
+### Phase 7 – Ranch, inventory, income
+- [ ] Plot assignment, place/pick up, roaming, capacity, collection pad, income ticking
+- [ ] Test: full loop catch → place → earn → collect; two players' plots stay separate
+
+### Phase 8 – Mounts
+- [ ] Mount selection, coin leveling, star-based level caps; replaces the test mount
+- [ ] Test: a leveled mount reaches farther segments
+
+### Phase 9 – Biome progression
+- [ ] Unlocks, level select, Savannah, starting-area shop, lasso tiers, biome multipliers
+- [ ] Test: reaching Savannah unlocks it permanently and it can be selected later
+
+### Phase 10 – Journal
+- [ ] Species/variant entries, silhouettes + `???`, star records, completion %, milestone rewards
+- [ ] Test: entries and completion update correctly on capture
+
+### Phase 11 – Failure, retry, monetization
+- [ ] Result screen; **gem retry first** (restart at the start of the level)
+- [ ] Then Robux products with safe receipt handling, isolated from the core loop
+- [ ] Test: retry restarts the correct level; purchases grant exactly once
+
+### Phase 12 – Leaderboards
+- [ ] Most animals caught, most money earned, rarest catch boards in the spawn area
+
+### Phase 13 – Polish
+- [ ] Low-poly art, terrain, animal models and animations, emergence/taming VFX, sound
+- [ ] Final UI styling for PC/mobile/console, performance pass on low-end mobile
+
+### Later
+- Quests (gem source), stealing
+
+---
 
 ## Implementation decision log
 - 2026-11-15 – Use Rojo with file-based source in `SRC/` (designer approved).
 - 2026-11-15 – Designer refinements adopted: dedicated animal data structure; seeded,
   reproducible RunPlanner; MonetizationService deferred until Phase 11.
-- 2026-11-15 – *Recommendation, awaiting confirmation:* store the capture biome as an id rather
-  than a copy of its multiplier number, so tuning a biome's multiplier later applies to animals
-  already caught there.
-- 2026-11-15 – *Recommendation, awaiting confirmation:* newly captured animals start at
-  mount Level 1.
+- 2026-11-15 – Capture biome stored as an id, not a copy of its multiplier; tuning a biome's
+  multiplier applies to animals already caught there (designer approved).
+- 2026-11-15 – Newly captured animals start at mount Level 1 (designer approved).
+- 2026-11-15 – Saved animal record = `{Species, Stars, Variant, BiomeCaught, Level, Placed}`,
+  keyed by a server-generated unique id. Save data carries `SchemaVersion` with migrations.
+  Saving uses ProfileStore, vendored at commit `45c9847` (designer approved).
+- 2026-11-15 – Roadmap adjustments (designer): temporary test mount in Phase 3; Phase 1 verifies
+  two players get separate profiles that save independently; Phase 11 tests gem retry first,
+  then Robux, with purchase handling isolated from the core loop.
+- 2026-11-15 – Roadmap separates building a system (functional, grey-box) from polishing it
+  (Phase 13). This checklist (Section C) is the working implementation checklist (designer).

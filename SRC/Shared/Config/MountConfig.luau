@@ -11,6 +11,9 @@
 
 local MountConfig = {}
 
+-- Level a newly captured animal starts at (designer approved 2026-11-15).
+MountConfig.StartingLevel = 1
+
 -- Maximum mount level, keyed by star rating.
 MountConfig.MaxLevelByStars = table.freeze({
 	[0] = 5,

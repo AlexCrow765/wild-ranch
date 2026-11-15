@@ -22,7 +22,9 @@ local RunService = game:GetService("RunService")
 type Kind = "Event" | "UnreliableEvent" | "Function"
 
 local Definitions: { [string]: Kind } = {
-	-- (none yet - added per phase)
+	-- Phase 1: data
+	PlayerDataSnapshot = "Event", -- server -> client: full copy of the player's own data
+	GetPlayerData = "Function", -- client -> server: fetch own data on start-up
 }
 
 local FOLDER_NAME = "Remotes"
