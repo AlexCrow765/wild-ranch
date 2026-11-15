@@ -1,0 +1,26 @@
+{
+  "name": "WildRanch",
+  "tree": {
+    "$className": "DataModel",
+
+    "ReplicatedStorage": {
+      "Shared": {
+        "$path": "SRC/Shared"
+      }
+    },
+
+    "ServerScriptService": {
+      "Server": {
+        "$path": "SRC/Server"
+      }
+    },
+
+    "StarterPlayer": {
+      "StarterPlayerScripts": {
+        "Client": {
+          "$path": "SRC/Client"
+        }
+      }
+    }
+  }
+}
