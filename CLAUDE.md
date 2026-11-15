@@ -104,3 +104,16 @@ At the time these instructions were created:
 - Do not overwhelm the designer with unrelated options.
 - Never represent an assumption as an approved design decision.
 - At the end of each task, give a concise implementation and test report, and identify the next required action.
+
+## 9. ChatGPT and designer review workflow
+
+This project may be developed with both Claude Code and ChatGPT.
+
+- Claude Code is responsible for inspecting and editing the local repository, implementing approved tasks, running available checks, and reporting the exact commit and changed files.
+- ChatGPT may review the GitHub repository and compare implementation against the documented design, architecture, and acceptance criteria. Treat ChatGPT review findings as review feedback to evaluate; do not blindly apply a suggestion that conflicts with an approved design or existing project constraints.
+- The designer is the final authority on gameplay decisions and approves consequential scope or design changes.
+- The designer performs Roblox Studio and device testing when those tests require their environment. Do not claim that ChatGPT or Claude has performed a manual Studio test unless it actually has.
+- For a review handoff, provide the GitHub commit SHA or branch, a concise summary, files changed, build/test results, and known untested behavior. Do not summarize only; make the changed code available for inspection in the repository.
+- Address confirmed review findings in a focused follow-up change. If a finding is debatable or would change design, explain the tradeoff and ask the designer before changing behavior.
+- Keep the repository as the shared source of code. Do not create parallel project copies or separate repositories for the same game.
+
