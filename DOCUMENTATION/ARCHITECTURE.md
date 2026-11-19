@@ -71,6 +71,17 @@ from spawning → taming → inventory → ranch → mount:
 - The seed is logged with each run and kept in the run session, so any encounter can be
   replayed in Studio with a debug command.
 
+### Multiplayer course model (designer decision 2026-11-18)
+- **Course geometry is shared**: one course per biome in the world; all riders use it at once.
+- **Encounters are individual**: each player's run has its own seeded plan. Player A may see a
+  Gold Deer where Player B sees a normal Fox; neither sees the other's encounter animals.
+  - The server keeps each player's plan; only that player's client receives it and renders
+    those animals locally.
+- **Players cannot collide**: riders (and mounts) are in a collision group that does not collide
+  with other riders, so passing through someone never changes your steering or path.
+- **Targeting only considers your own encounter animals**, never other players or their animals.
+- The server validates every target, lasso and catch against **that player's** plan and position.
+
 ### Monetization
 - `MonetizationService` (gem products, Robux, `ProcessReceipt`) stays in the architecture but is
   **not implemented until Phase 11**, isolated so a purchase failure can never block the core loop.
@@ -165,8 +176,6 @@ that needs it fails with an `OPEN QUESTION` error. Remove a row once decided and
 
 | Needed by | Decision |
 |---|---|
-| Phase 3 | Shared course for all players vs. a private course copy per player |
-| Phase 3 | Starter mount for new players (they own no animals) |
 | Phase 3 | Obstacles and jumping: the doc lists "hits an obstacle" as a failure and mentions jumping, but neither is defined |
 | Phase 3 | Segments per biome (the multiplier chart implies 5), segment length, corridor width |
 | Phase 3 | Stamina consumed per stud; temporary test mount's stamina |
@@ -179,6 +188,7 @@ that needs it fails with an `OPEN QUESTION` error. Remove a row once decided and
 | Phase 7 | **Species base income**; **biome income multipliers** |
 | Phase 7 | Starting coins/gems, inventory and ranch capacities, pen milestones, offline income |
 | Phase 8 | **Species base stamina**, stamina per level, mount level prices |
+| Phase 8 | Starter mount for new players (they own no animals); Phase 3 uses the temporary test mount instead |
 | Phase 9 | Biome unlock requirements, starting-area shop items and prices |
 | Phase 10 | Journal milestone rewards |
 | Phase 11 | Gem retry cost, Robux products and prices, quests |
@@ -210,3 +220,7 @@ that needs it fails with an `OPEN QUESTION` error. Remove a row once decided and
 - 2026-11-18 – Review follow-up: rules reject NaN/infinite/negative weights, non-positive or
   non-finite stamina rates and amounts, and non-finite taming time steps; edge-case tests added
   for invalid weights, stamina rates, star ratings and inputs after a finished tame.
+- 2026-11-18 – Shared course geometry with individually generated encounters per player; players
+  pass through each other without affecting steering or targeting; the server validates each
+  player's encounters and catches independently (designer decision).
+- 2026-11-18 – Starter mount moved to "needed by Phase 8": Phase 3 rides the temporary test mount.
