@@ -82,6 +82,20 @@ from spawning → taming → inventory → ranch → mount:
 - **Targeting only considers your own encounter animals**, never other players or their animals.
 - The server validates every target, lasso and catch against **that player's** plan and position.
 
+### Biome course structure and duration (designer decision 2026-11-18)
+- **Every biome/level has 5 segments**, after its starting area.
+- Star-odds multipliers by zone (unchanged, see `RarityConfig`):
+  starting area 1×, Segment 1 1×, Segment 2 1.25×, Segment 3 1.5×, Segment 4 1.75×, Segment 5 2×.
+- **Target traversal time for a full biome is 90 seconds**: about **18 seconds per segment**
+  (5 × 18 s), assuming consistent forward movement. The starting area is not part of the 90 s.
+- The 90 s is the time to ride the *whole* biome for a player whose stamina lasts that far. It is
+  **not** a guaranteed run length: a mount with less stamina runs out partway through.
+- **Travel time and stamina are separate mechanics.** The 18 s per segment sets the course's
+  *length* (segment length = forward riding speed × 18 s). It is **not** a stamina drain rate.
+  Stamina still drains by distance only, at a rate still to be decided (stamina per stud).
+- Stamina decides how far a player gets; mount leveling and stamina upgrades should let players
+  reach progressively deeper segments.
+
 ### Monetization
 - `MonetizationService` (gem products, Robux, `ProcessReceipt`) stays in the architecture but is
   **not implemented until Phase 11**, isolated so a purchase failure can never block the core loop.
@@ -177,7 +191,7 @@ that needs it fails with an `OPEN QUESTION` error. Remove a row once decided and
 | Needed by | Decision |
 |---|---|
 | Before they are added | Obstacles and jumping: what they are, placement, jump controls. **Excluded from Phase 3** (designer decision 2026-11-18); may relate to aggressive animals (Phase 4) |
-| Phase 3 | Segments per biome (the multiplier chart implies 5), segment length, corridor width |
+| Phase 3 | Forward riding speed (studs per second) – this fixes segment length (speed × 18 s); corridor width |
 | Phase 3 | Stamina consumed per stud; temporary test mount's stamina |
 | Phase 4 | Species list per biome and spawn weights by distance |
 | Phase 4 | Animal count per segment: equal chance of 3, 4 or 5? |
@@ -228,3 +242,8 @@ that needs it fails with an `OPEN QUESTION` error. Remove a row once decided and
   stamina reaching 0 or a failed tame. Riding code leaves room to add them later (designer decision).
 - 2026-11-18 – Review follow-up (ChatGPT on df339fe): WeightedRandom also rejects a total weight
   that overflows to infinity; edge-case test added.
+- 2026-11-18 – Each biome has **5 segments**; target time to ride a full biome is **90 s**
+  (~18 s per segment at consistent forward movement). Segment multipliers unchanged
+  (start 1×, then 1×, 1.25×, 1.5×, 1.75×, 2×). 90 s is a target for players with enough
+  stamina, not a guaranteed run length. Travel time is separate from stamina: the 18 s sets
+  segment length, not a drain rate; stamina per stud is still undecided (designer decision).
