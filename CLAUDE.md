@@ -10,7 +10,7 @@ Work incrementally. Implement the current agreed phase, preserve existing behavi
 
 Read these project documents before making architectural or gameplay changes:
 
-1. `Wild_Ranch_Complete_Design_Notes.docx` — game-design source of truth, including the designer's gameplay decisions.
+1. `DOCUMENTATION/Wild_Ranch_Complete_Design_Notes.docx` — game-design source of truth, including the designer's gameplay decisions.
 2. `DOCUMENTATION/ARCHITECTURE.md` — technical architecture, implementation conventions, development roadmap (Section C), and decision log.
 3. This `CLAUDE.md` — operating instructions for Claude Code.
 
