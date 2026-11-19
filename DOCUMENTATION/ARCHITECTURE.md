@@ -1,8 +1,12 @@
 # Wild Ranch – Development Documentation
 
-The design source of truth is `Wild_Ranch_Complete_Design_Notes.docx`. This file records
-*how* the game is built: architecture (B), the implementation checklist (C), and the
+The design source of truth is `DOCUMENTATION/Wild_Ranch_Complete_Design_Notes.docx`. This file
+records *how* the game is built: architecture (B), the implementation checklist (C), and the
 implementation decisions made along the way.
+
+Where a later designer decision recorded here replaces a rule in the design notes, the
+**"Designer decisions that supersede the design notes"** section below lists it. Those entries
+win over the .docx until the .docx is updated.
 
 ---
 
@@ -52,7 +56,7 @@ from spawning → taming → inventory → ranch → mount:
 | `OwnedAnimal` (saved) | Created by the server on Capture & Return Home | all traits + `Level` (starts at 1), `Placed` (in ranch or not); stored under a server-generated unique id |
 
 - Only the server creates an owned animal or changes its fields.
-- Derived stats (income/sec, max stamina, max level) are **computed** from these fields plus
+- Derived stats (income/sec, speed, max stamina, max level) are **computed** from these fields plus
   Config by `Shared/Rules`, never stored, so a save can't hold a stale or tampered number.
 - `BiomeCaught` is a biome id; its income multiplier is looked up from `BiomeConfig`.
 
@@ -66,7 +70,8 @@ from spawning → taming → inventory → ranch → mount:
 - At the starting line the server creates a **seed** (`Random.new():NextInteger(1, 2^31 - 1)`).
 - `Shared/Rules/RunPlanner` is a pure function: `RunPlanner.Plan(seed, biome, reachableSegments)`
   → run plan. It uses one `Random.new(seed)` and draws in a fixed order
-  (segment → animal count → per animal: line position, side, species, stars, variant).
+  (segment → animal count (1–3) → which encounter slots → per animal: side, emergence position,
+  species, stars, variant).
   Same seed + same inputs + same config = identical plan.
 - The seed is logged with each run and kept in the run session, so any encounter can be
   replayed in Studio with a debug command.
@@ -82,19 +87,94 @@ from spawning → taming → inventory → ranch → mount:
 - **Targeting only considers your own encounter animals**, never other players or their animals.
 - The server validates every target, lasso and catch against **that player's** plan and position.
 
-### Biome course structure and duration (designer decision 2026-11-18)
-- **Every biome/level has 5 segments**, after its starting area.
-- Star-odds multipliers by zone (unchanged, see `RarityConfig`):
-  starting area 1×, Segment 1 1×, Segment 2 1.25×, Segment 3 1.5×, Segment 4 1.75×, Segment 5 2×.
-- **Target traversal time for a full biome is 90 seconds**: about **18 seconds per segment**
-  (5 × 18 s), assuming consistent forward movement. The starting area is not part of the 90 s.
-- The 90 s is the time to ride the *whole* biome for a player whose stamina lasts that far. It is
-  **not** a guaranteed run length: a mount with less stamina runs out partway through.
-- **Travel time and stamina are separate mechanics.** The 18 s per segment sets the course's
-  *length* (segment length = forward riding speed × 18 s). It is **not** a stamina drain rate.
-  Stamina still drains by distance only, at a rate still to be decided (stamina per stud).
-- Stamina decides how far a player gets; mount leveling and stamina upgrades should let players
-  reach progressively deeper segments.
+### Biome course dimensions (designer decisions 2026-11-18)
+| Value | Decision |
+|---|---|
+| Segments per biome | **5**, after the starting area |
+| Baseline riding speed | **32 studs/s** |
+| Segment length | **576 studs** (≈ 18 s at 32 studs/s) |
+| Full biome length | **2,880 studs** (5 × 576) |
+| Target time for a full biome | **≈ 90 s** with enough stamina (starting area not included) |
+| Star-odds multipliers | starting area 1×, Seg 1 1×, Seg 2 1.25×, Seg 3 1.5×, Seg 4 1.75×, Seg 5 2× (3–5★ boosted only, see `RarityConfig`) |
+
+- The 90 s is a **target** for a player whose stamina lasts the whole biome, **not** a guaranteed
+  run length: a mount with less stamina runs out partway through.
+- **Travel time and stamina are separate mechanics.** The 18 s per segment sets course length;
+  it is **not** a stamina drain rate. Stamina drains by distance only.
+- Stamina decides how far a player gets; mount leveling and upgrades let players reach
+  progressively deeper segments.
+
+### Corridor and bushes (designer decisions 2026-11-18)
+- **Total corridor width: 100 studs.**
+- Bushes line **both sides**, each up to **13 studs** wide.
+- **Invisible collision boundaries** stop players and mounts from entering the bushes.
+- With maximum-width bushes the playable centre is **at least 74 studs** wide (100 − 2 × 13).
+- Encounter animals emerge **from these bushes** into the corridor.
+
+### Encounter generation (designer decisions 2026-11-18)
+- Each segment independently generates **1–3 animals** → **5–15 animals** per full biome.
+- Each segment has **predefined encounter slots**; the server randomly selects slots for each
+  player's run. Selected slots have **varied spacing, subject to a minimum separation**.
+  (Slot count, layout and the minimum separation are still open.)
+- Each animal emerges from the **left or right** bushes and has an assigned **emergence position**.
+- Species, star rating and variant are decided in the player's **run plan** at the starting line.
+- Plans are **independent per player** even though the course geometry is shared.
+
+### Emergence and animal movement (designer decisions 2026-11-18)
+- Animals start **hidden inside their assigned bushes**; when the player approaches, the animal
+  **runs out of the bushes** into the corridor.
+- Movement uses **Rodeo Stampede** as the behavioural reference.
+- Animals have **species-specific movement speeds and behaviours**; they are **not** forced to
+  move at the player's speed. Species should feel distinct, and some should be substantially
+  harder to pursue, so players need progressively better mounts to catch them reliably.
+- Detailed per-species behaviour profiles are designed later, with the animal roster.
+
+### Animal stats, mount leveling and variants (designer decisions 2026-11-18)
+**Species base stats.** Every species has its own independently designed **base speed**,
+**base stamina** and **base income**. There is no required trade-off between speed and stamina.
+
+**Variant multipliers** (apply equally to all three base stats; supersede the old Gold 2× /
+Rainbow 3–4×):
+
+| Variant | Speed | Stamina | Income |
+|---|---:|---:|---:|
+| Normal | 1× | 1× | 1× |
+| Gold | 1.25× | 1.25× | 1.25× |
+| Rainbow | 1.75× | 1.75× | 1.75× |
+
+**Mount leveling.** Same rates for every species, additive, never compounded:
+- Speed: **+0.1%** of base speed per level gained (small secondary benefit).
+- Stamina: **+1%** of base stamina per level gained (the main benefit).
+
+The variant multiplier is applied to the species' base stats **before** level bonuses:
+```
+Speed   = Base Speed   × Variant × (1 + 0.001 × (Level − 1))
+Stamina = Base Stamina × Variant × (1 + 0.01  × (Level − 1))
+Income  = Base Income  × Variant × Star income multiplier × Biome income multiplier
+```
+
+**Star rating** (unchanged): stars affect only the **income multiplier** (1, 1.25, 1.5, 1.75, 2,
+2.5 for 0–5★) and the **maximum mount level** (5, 10, 20, 30, 40, 50). Stars do **not** change
+base speed, base stamina or the growth percentages.
+
+### Phase 3 prototype targets (designer decisions 2026-11-18)
+- **Temporary test mount: 100 stamina**, riding at the 32 studs/s baseline.
+- **Starter mount target:** reach about **halfway through Segment 2**, about **864 studs**
+  (576 + 288), about **27 s** of riding at 32 studs/s.
+- **Provisional stamina drain: ≈ 0.11574 stamina per stud** (100 ÷ 864).
+  **This is a prototype value that must be validated in Studio**, not a final balance value.
+
+### Designer decisions that supersede the design notes
+These later decisions replace rules in `Wild_Ranch_Complete_Design_Notes.docx`. Follow these
+until the .docx is updated.
+
+| Design notes said | Now (2026-11-18) |
+|---|---|
+| 3–5 animals per segment, one invisible spawning line per animal, segment split evenly, random point along the line (§2.C) | 1–3 animals per segment in randomly selected predefined encounter slots with varied spacing and a minimum separation |
+| Mount speed removed completely as a core/visible/upgradable stat; leveling does not increase speed (§2.F) | Species have base speed; leveling adds +0.1% of base speed per level; variants multiply speed |
+| Each mount level adds a fixed stamina amount (§2.F) | Each level adds 1% of the (variant-adjusted) base stamina – still a fixed amount per level for a given animal, but it scales with the species |
+| Gold 2× base stats; Rainbow 3× or 4× (§2.D) | Gold 1.25×, Rainbow 1.75× on speed, stamina and income |
+| Animals run just ahead of the player at a pace that lets the player choose (§2.E) | Species-specific speeds and behaviours; some species are substantially harder to pursue |
 
 ### Monetization
 - `MonetizationService` (gem products, Robux, `ProcessReceipt`) stays in the architecture but is
@@ -125,17 +205,24 @@ build phase – it belongs to Phase 13. Phase order is fixed.
 - [x] Test: automated tests + large roll simulations match the design doc's odds
 
 ### Phase 3 – Grey-box course & riding
-- [ ] Grey-box Plains: starting area, starting line, segments, walls, bush strips (plain parts)
-- [ ] Auto-forward riding with left/right steering on PC, mobile and gamepad
-- [ ] **Temporary test mount** with fixed stamina (removed in Phase 8)
-- [ ] Stamina drains by distance; collapse at 0 ends the run; return to ranch
+- [ ] Grey-box Plains: starting area, starting line, 5 × 576-stud segments, 100-stud corridor,
+      bush strips (up to 13 studs each side) behind invisible collision boundaries (plain parts)
+- [ ] Auto-forward riding at 32 studs/s with left/right steering on PC, mobile and gamepad;
+      riders pass through each other
+- [ ] **Temporary test mount** with 100 stamina (removed in Phase 8)
+- [ ] Stamina drains by distance (provisional ≈ 0.11574/stud); collapse at 0 ends the run;
+      return to ranch
+- [ ] Test: the test mount runs out at ≈ 864 studs (about halfway through Segment 2); tune the
+      drain rate in Studio if needed
 - [ ] Test: ride until stamina runs out on all three input types
 - Not in this phase: terrain, real models, animations, effects
 
 ### Phase 4 – Run generation & encounters
-- [ ] Reachability → segments generated; seeded RunPlanner; spawn lines; left/right sides
-- [ ] Animals emerge from bushes, flee ahead, can pull ahead
-- [ ] Test: debug view of lines; same seed reproduces the same plan; unreachable segments empty
+- [ ] Reachability → segments generated; seeded RunPlanner; 1–3 animals per segment in
+      randomly selected encounter slots; left/right side and emergence position per animal
+- [ ] Animals hide in bushes, run out as the player approaches, then move with
+      species-specific speed and behaviour; can pull ahead
+- [ ] Test: debug view of slots; same seed reproduces the same plan; unreachable segments empty
 - Not in this phase: emergence animation polish, final animal models
 
 ### Phase 5 – Targeting & lasso
@@ -154,7 +241,8 @@ build phase – it belongs to Phase 13. Phase order is fixed.
 - [ ] Test: full loop catch → place → earn → collect; two players' plots stay separate
 
 ### Phase 8 – Mounts
-- [ ] Mount selection, coin leveling, star-based level caps; replaces the test mount
+- [ ] Mount selection, coin leveling (+1% base stamina, +0.1% base speed per level),
+      star-based level caps; replaces the test mount
 - [ ] Test: a leveled mount reaches farther segments
 
 ### Phase 9 – Biome progression
@@ -191,18 +279,19 @@ that needs it fails with an `OPEN QUESTION` error. Remove a row once decided and
 | Needed by | Decision |
 |---|---|
 | Before they are added | Obstacles and jumping: what they are, placement, jump controls. **Excluded from Phase 3** (designer decision 2026-11-18); may relate to aggressive animals (Phase 4) |
-| Phase 3 | Forward riding speed (studs per second) – this fixes segment length (speed × 18 s); corridor width |
-| Phase 3 | Stamina consumed per stud; temporary test mount's stamina |
+| Phase 3 | **Final stamina consumption per stud** – provisional 0.11574/stud must be validated in Studio |
+| Phase 3 | Exact corridor/bush geometry implementation (bush shapes, boundary placement within the 100-stud corridor) |
+| Phase 3 | Any movement tuning needed after Studio testing (steering feel, acceleration) |
 | Phase 4 | Species list per biome and spawn weights by distance |
-| Phase 4 | Animal count per segment: equal chance of 3, 4 or 5? |
-| Phase 4 | Bush emergence trigger distance; flee speed/turning/aggression; whether Gold/Rainbow escape faster |
+| Phase 4 | Encounter slot count and layout per segment; minimum separation between selected slots |
+| Phase 4 | Chance of 1, 2 or 3 animals per segment (equal unless decided otherwise) |
+| Phase 4 | Bush emergence trigger distance; species movement/escape behaviours (Rodeo Stampede reference); whether Gold/Rainbow escape faster |
 | Phase 5 | Yellow/red ring radii, lasso trigger, lasso tiers and prices |
 | Phase 6 | Taming balance concern (two correct inputs inside the grace period always tame) – keep or adjust |
-| Phase 7 | **Rainbow stat multiplier (3× or 4×)** |
 | Phase 7 | **Species base income**; **biome income multipliers** |
 | Phase 7 | Starting coins/gems, inventory and ranch capacities, pen milestones, offline income |
-| Phase 8 | **Species base stamina**, stamina per level, mount level prices |
-| Phase 8 | Starter mount for new players (they own no animals); Phase 3 uses the temporary test mount instead |
+| Phase 8 | **Species base speed and base stamina**; mount level prices |
+| Phase 8 | Which animal the starter mount is (its reach target is ≈ 864 studs); Phase 3 uses the temporary test mount instead |
 | Phase 9 | Biome unlock requirements, starting-area shop items and prices |
 | Phase 10 | Journal milestone rewards |
 | Phase 11 | Gem retry cost, Robux products and prices, quests |
@@ -228,9 +317,9 @@ that needs it fails with an `OPEN QUESTION` error. Remove a row once decided and
 - 2026-11-18 – Segment star multiplier boosts **3–5★ only**; 0–2★ keep their base weights, then
   the distribution is normalized to 100% (designer decision). At 2×: 45.0 / 22.5 / 12.6 /
   14.4 / 4.5 / 0.9 % for 0–5★.
-- 2026-11-18 – *Interpretation:* the Gold/Rainbow multiplier applies to a species' **base**
-  stamina; the fixed per-level stamina bonus is added on top and is not multiplied. Level 1 has
-  no bonus. All random rolls draw from arrays in a fixed order so a seed always reproduces.
+- 2026-11-18 – *Interpretation (superseded later the same day by the stat/leveling decision
+  below):* the Gold/Rainbow multiplier applied to base stamina only, with a flat per-level bonus.
+  Still current: all random rolls draw from arrays in a fixed order so a seed always reproduces.
 - 2026-11-18 – Review follow-up: rules reject NaN/infinite/negative weights, non-positive or
   non-finite stamina rates and amounts, and non-finite taming time steps; edge-case tests added
   for invalid weights, stamina rates, star ratings and inputs after a finished tame.
@@ -247,3 +336,20 @@ that needs it fails with an `OPEN QUESTION` error. Remove a row once decided and
   (start 1×, then 1×, 1.25×, 1.5×, 1.75×, 2×). 90 s is a target for players with enough
   stamina, not a guaranteed run length. Travel time is separate from stamina: the 18 s sets
   segment length, not a drain rate; stamina per stud is still undecided (designer decision).
+- 2026-11-18 – Course dimensions (designer): 32 studs/s baseline riding speed; 576-stud segments;
+  2,880-stud biome; ≈ 90 s full traversal. Corridor 100 studs wide with bushes up to 13 studs per
+  side behind invisible collision boundaries (≥ 74-stud playable centre). Supersedes an earlier
+  70-stud corridor / 24 studs/s / 2-minute proposal that was never adopted here.
+- 2026-11-18 – Encounters (designer): 1–3 animals per segment (5–15 per biome) in randomly selected
+  predefined slots with varied spacing and a minimum separation; left/right emergence position per
+  animal; animals hide in bushes and run out as the player approaches; species-specific movement
+  (Rodeo Stampede reference). **Supersedes** the design notes' 3–5 animals / one spawning line per
+  animal.
+- 2026-11-18 – Stats (designer): species have independent base speed, stamina and income. Leveling
+  adds +0.1% base speed and +1% base stamina per level (additive, from base). Variants Gold 1.25×,
+  Rainbow 1.75× on all three stats, applied before level bonuses. Stars affect only income and
+  max level. **Supersedes** the design notes' "no mount speed stat", fixed stamina per level and
+  Gold 2× / Rainbow 3–4×.
+- 2026-11-18 – Phase 3 prototype (designer): test mount 100 stamina; starter mount should reach
+  ≈ 864 studs (mid-Segment 2, ≈ 27 s); provisional drain ≈ 0.11574 stamina/stud, to be
+  validated in Studio.
