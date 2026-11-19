@@ -18,7 +18,9 @@ export type Species = {
 	DisplayName: string,
 	Biome: string, -- biome id from BiomeConfig
 	DebugOnly: boolean?,
-	-- OPEN: BaseIncome, BaseStamina, SpawnWeight, behaviour
+	BaseIncome: number?, -- OPEN QUESTION: per-species value not decided
+	BaseStamina: number?, -- OPEN QUESTION: per-species value not decided
+	-- OPEN: spawn weights by distance, behaviour
 }
 
 local SpeciesConfig = {}

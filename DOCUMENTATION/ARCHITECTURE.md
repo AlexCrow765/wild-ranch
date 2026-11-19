@@ -87,17 +87,17 @@ build phase – it belongs to Phase 13. Phase order is fixed.
 - [x] Rojo project, folder layout, Loader, Remotes list, locked config values
 - [x] Test: Rojo build places every script correctly
 
-### Phase 1 – Data foundation
-- [ ] ProfileStore saving with session locks, versioned schema + migrations
-- [ ] Owned animals: unique id, `{Species, Stars, Variant, BiomeCaught, Level, Placed}`
-- [ ] Coins and gems balances; client receives a read-only copy of its own data
-- [ ] Studio debug commands (give/remove animal, add coins, print profile)
-- [ ] Test: data survives rejoin
-- [ ] Test: **two players** join, get separate profiles, and save independently
+### Phase 1 – Data foundation ✅
+- [x] ProfileStore saving with session locks, versioned schema + migrations
+- [x] Owned animals: unique id, `{Species, Stars, Variant, BiomeCaught, Level, Placed}`
+- [x] Coins and gems balances; client receives a read-only copy of its own data
+- [x] Studio debug commands (give/remove animal, add coins, print profile)
+- [x] Test: data survives rejoin
+- [x] Test: **two players** join, get separate profiles, and save independently
 
-### Phase 2 – Rules modules
-- [ ] Star/variant/species rolls with normalization, income, stamina, level caps, taming math
-- [ ] Test: automated tests + large roll simulations match the design doc's odds
+### Phase 2 – Rules modules ✅
+- [x] Star/variant/species rolls with normalization, income, stamina, level caps, taming math
+- [x] Test: automated tests + large roll simulations match the design doc's odds
 
 ### Phase 3 – Grey-box course & riding
 - [ ] Grey-box Plains: starting area, starting line, segments, walls, bush strips (plain parts)
@@ -172,3 +172,9 @@ build phase – it belongs to Phase 13. Phase order is fixed.
   then Robux, with purchase handling isolated from the core loop.
 - 2026-11-15 – Roadmap separates building a system (functional, grey-box) from polishing it
   (Phase 13). This checklist (Section C) is the working implementation checklist (designer).
+- 2026-11-18 – Segment star multiplier boosts **3–5★ only**; 0–2★ keep their base weights, then
+  the distribution is normalized to 100% (designer decision). At 2×: 45.0 / 22.5 / 12.6 /
+  14.4 / 4.5 / 0.9 % for 0–5★.
+- 2026-11-18 – *Interpretation:* the Gold/Rainbow multiplier applies to a species' **base**
+  stamina; the fixed per-level stamina bonus is added on top and is not multiplied. Level 1 has
+  no bonus. All random rolls draw from arrays in a fixed order so a seed always reproduces.

@@ -28,8 +28,9 @@ RarityConfig.StartingAreaStarMultiplier = 1
 RarityConfig.SegmentStarMultipliers = table.freeze({ 1, 1.25, 1.5, 1.75, 2 })
 RarityConfig.MaxStarMultiplier = 2
 
--- OPEN QUESTION (needed by Phase 4): which star tiers count as "higher stars"
--- and receive the segment multiplier before normalization (1-5 stars, or 2-5 stars?).
+-- Star ratings at or above this receive the segment multiplier before normalization
+-- (designer decision 2026-11-18: 3-5 stars are boosted; 0-2 stars are not).
+RarityConfig.MinBoostedStars = 3
 
 -- Visual variants. Rolled independently of star rating and do NOT receive the
 -- segment star multiplier. Odds in percent; sums to 100.

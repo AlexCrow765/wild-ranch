@@ -29,6 +29,7 @@ local DebugService = {
 local HELP = [[
 WildRanchDebug commands:
   help
+  test                                           run all automated tests (ServerStorage.Tests)
   report                                         all players' data + store state
   give <player> <species> <stars> <variant> <biome>
   remove <player> <animalId>
@@ -79,6 +80,13 @@ local function run(commandLine: string): string
 
 	if command == "" or command == "help" then
 		return HELP
+	elseif command == "test" then
+		local tests = ServerStorage:FindFirstChild("Tests")
+		local runner = tests and tests:FindFirstChild("TestRunner")
+		if runner == nil or not runner:IsA("ModuleScript") then
+			return "ServerStorage.Tests.TestRunner not found (is Rojo connected?)"
+		end
+		return (require :: any)(runner).Run()
 	elseif command == "report" then
 		local lines = { `DataStore state: {DataService.StoreState()}` }
 		for _, player in Players:GetPlayers() do

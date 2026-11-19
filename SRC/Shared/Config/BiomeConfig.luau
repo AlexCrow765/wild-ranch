@@ -12,7 +12,8 @@ export type Biome = {
 	Id: string,
 	DisplayName: string,
 	Level: number,
-	-- OPEN: IncomeMultiplier, lasso requirement, unlock requirement, species pool.
+	IncomeMultiplier: number?, -- OPEN QUESTION: per-biome value not decided
+	-- OPEN: lasso requirement, unlock requirement, species pool.
 }
 
 local BiomeConfig = {}
