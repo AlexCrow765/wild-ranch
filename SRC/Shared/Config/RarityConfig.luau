@@ -41,13 +41,12 @@ RarityConfig.VariantOdds = table.freeze({
 	Rainbow = 0.5,
 })
 
--- Multiplier applied to a species' base stats (base income and base stamina).
--- OPEN QUESTION: Rainbow is 3x or 4x (designer has not chosen). Left unset on purpose;
--- code that needs it must fail loudly rather than guess.
+-- Multiplier applied equally to a species' base speed, base stamina and base income,
+-- before mount-level bonuses (designer decision 2026-11-18; supersedes Gold 2x / Rainbow 3-4x).
 RarityConfig.VariantStatMultiplier = table.freeze({
 	Normal = 1,
-	Gold = 2,
-	-- Rainbow = ?,
+	Gold = 1.25,
+	Rainbow = 1.75,
 })
 
 return table.freeze(RarityConfig)

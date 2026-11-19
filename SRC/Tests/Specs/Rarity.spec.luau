@@ -100,12 +100,13 @@ return function(t)
 		end
 	end)
 
-	t.test("variant stat multipliers: Normal 1, Gold 2, Rainbow undecided (errors)", function()
+	t.test("variant stat multipliers: Normal 1, Gold 1.25, Rainbow 1.75; unknown variant errors", function()
 		t.eq(Rarity.VariantStatMultiplier("Normal"), 1)
-		t.eq(Rarity.VariantStatMultiplier("Gold"), 2)
+		t.eq(Rarity.VariantStatMultiplier("Gold"), 1.25)
+		t.eq(Rarity.VariantStatMultiplier("Rainbow"), 1.75)
 		t.errors(function()
-			Rarity.VariantStatMultiplier("Rainbow")
-		end, "OPEN QUESTION")
+			Rarity.VariantStatMultiplier("Silver")
+		end, "Silver")
 	end)
 
 	t.test("the same seed reproduces the same rolls", function()

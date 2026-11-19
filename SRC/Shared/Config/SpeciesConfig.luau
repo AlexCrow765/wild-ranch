@@ -6,7 +6,7 @@
 	Design rules (LOCKED, section 2.D): each biome has a limited species pool and a
 	species is exclusive to the biome it is introduced in.
 
-	OPEN QUESTIONS: the real species list per biome, base income, base stamina,
+	OPEN QUESTIONS: the real species list per biome, base speed, base stamina, base income,
 	spawn weights by distance, and movement/aggression behaviour.
 
 	DebugOnly species exist only so systems can be tested before the real roster is
@@ -18,8 +18,9 @@ export type Species = {
 	DisplayName: string,
 	Biome: string, -- biome id from BiomeConfig
 	DebugOnly: boolean?,
-	BaseIncome: number?, -- OPEN QUESTION: per-species value not decided
+	BaseSpeed: number?, -- studs/s; OPEN QUESTION: per-species value not decided
 	BaseStamina: number?, -- OPEN QUESTION: per-species value not decided
+	BaseIncome: number?, -- OPEN QUESTION: per-species value not decided
 	-- OPEN: spawn weights by distance, behaviour
 }
 

@@ -1,25 +1,37 @@
 --!strict
 --[[
 	CourseConfig
-	Course segments and animal spawn layout.
+	Biome course dimensions and encounter layout.
 
-	Source: Wild_Ranch_Complete_Design_Notes.docx, section 2.C (LOCKED).
-	- Each reachable segment rolls 3-5 animals. No herds.
-	- One invisible spawning line per animal; the segment is split as evenly as possible.
-	- Each animal's spawn point is random along its own line.
-	- Each animal independently rolls left/right side (50/50).
+	Sources: design notes section 2.C, as superseded by designer decisions of 2026-11-18
+	(see ARCHITECTURE.md "Biome course dimensions", "Corridor and bushes", "Encounter generation"):
+	- 5 segments per biome after the starting area; ~18 s per segment, ~90 s per biome.
+	- 1-3 animals per segment in randomly selected predefined encounter slots (no herds).
+	- Each animal independently emerges from the left or right bushes.
 	- Everything is rolled when the player crosses the starting line.
+	- Travel time is separate from stamina: the 18 s sets segment length, not a drain rate.
 ]]
 
 local CourseConfig = {}
 
-CourseConfig.MinAnimalsPerSegment = 3
-CourseConfig.MaxAnimalsPerSegment = 5
+-- Course length
+CourseConfig.SegmentsPerBiome = 5
+CourseConfig.BaselineRidingSpeed = 32 -- studs per second
+CourseConfig.SegmentTargetSeconds = 18
+CourseConfig.SegmentLengthStuds = 576 -- 32 studs/s x 18 s
+CourseConfig.BiomeLengthStuds = 2880 -- 5 x 576
 
-CourseConfig.LeftSideChance = 0.5
+-- Corridor (playable centre >= 100 - 2 x 13 = 74 studs; invisible boundaries keep riders out of bushes)
+CourseConfig.CorridorWidthStuds = 100
+CourseConfig.MaxBushWidthStuds = 13 -- per side
 
--- OPEN QUESTIONS (needed by Phase 3):
--- segments per biome (the multiplier chart implies 5), segment length,
--- corridor width, wall dimensions, bush emergence trigger distance.
+-- Encounters
+CourseConfig.MinAnimalsPerSegment = 1
+CourseConfig.MaxAnimalsPerSegment = 3
+CourseConfig.LeftSideChance = 0.5 -- independent per animal (design notes 2.C)
+
+-- OPEN QUESTIONS (needed by Phase 3/4):
+-- encounter slot count and layout per segment, minimum separation between selected slots,
+-- chance of 1/2/3 animals, bush emergence trigger distance, exact bush/boundary geometry.
 
 return table.freeze(CourseConfig)

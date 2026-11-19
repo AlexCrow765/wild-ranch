@@ -28,9 +28,9 @@ win over the .docx until the .docx is updated.
 ```
 SRC/Shared/Config/   all tunable numbers (locked values from the design doc; OPEN items marked)
 SRC/Shared/Types/    data shapes shared by client and server (Animal, PlayerData)
-SRC/Shared/Rules/    pure game-rule functions (rolls, income, stamina, taming math)  [Phase 2]
+SRC/Shared/Rules/    pure game-rule functions (rolls, income, speed, stamina, level scaling, taming math)
 SRC/Shared/Net/      Remotes – the one list of every RemoteEvent/RemoteFunction
-SRC/Shared/Util/     Signal, Loader
+SRC/Shared/Util/     Signal, Loader, WeightedRandom, Validate
 SRC/Server/Main      boots Services/ ; Services/<Name>Service.luau ; Data/ (schema, migrations)
 SRC/Server/Vendor/   ProfileStore
 SRC/Client/Main      boots Controllers/ ; Controllers/<Name>Controller.luau ; UI/ (later)
@@ -353,3 +353,8 @@ that needs it fails with an `OPEN QUESTION` error. Remove a row once decided and
 - 2026-11-18 – Phase 3 prototype (designer): test mount 100 stamina; starter mount should reach
   ≈ 864 studs (mid-Segment 2, ≈ 27 s); provisional drain ≈ 0.11574 stamina/stud, to be
   validated in Studio.
+- 2026-11-18 – Code aligned with the Phase 3 decisions (no Phase 3 gameplay built): variant
+  multipliers Gold 1.25× / Rainbow 1.75×; `MountConfig` speed/stamina growth (0.1% / 1% per
+  level), provisional `StaminaPerStud = 100/864`, `TestMountStamina = 100`; `CourseConfig` course
+  dimensions and 1–3 animals per segment; `SpeciesConfig` gains `BaseSpeed`; new `LevelScaling`
+  and `Speed` rules; `Stamina.Max` uses the percentage formula; tests updated.

@@ -1,12 +1,18 @@
 --!strict
--- Income, stamina and mount level caps checked against design doc sections 2.F and 2.H.
+-- Income, speed, stamina, course dimensions and mount level caps, checked against the design
+-- notes (2.F, 2.H) and the designer decisions of 2026-11-18 recorded in ARCHITECTURE.md.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Rules = Shared:WaitForChild("Rules")
+local Config = Shared:WaitForChild("Config")
 local Income = require(Rules:WaitForChild("Income"))
 local Stamina = require(Rules:WaitForChild("Stamina"))
+local Speed = require(Rules:WaitForChild("Speed"))
+local Rarity = require(Rules:WaitForChild("Rarity"))
+local CourseConfig = require(Config:WaitForChild("CourseConfig"))
+local MountConfig = require(Config:WaitForChild("MountConfig"))
 local Animal = require(Shared:WaitForChild("Types"):WaitForChild("Animal"))
 
 local EPS = 1e-9
@@ -20,7 +26,7 @@ return function(t)
 	end)
 
 	t.test("income formula = base x variant x star x biome", function()
-		-- e.g. base 10, Gold (2x), 4 stars (2x), biome 1.5x
+		-- pure formula: base 10, variant multiplier 2, 4 stars (2x), biome 1.5x
 		t.near(Income.PerSecond(10, 2, 4, 1.5), 60, EPS)
 		t.near(Income.PerSecond(7, 1, 0, 1), 7, EPS)
 	end)
@@ -31,13 +37,53 @@ return function(t)
 		end, "OPEN QUESTION")
 	end)
 
-	t.test("max stamina = base x variant + fixed bonus per level above 1", function()
-		t.eq(Stamina.Max(100, 1, 1, 10), 100, "level 1 has no bonus")
-		t.eq(Stamina.Max(100, 1, 5, 10), 140, "4 levels x 10")
-		t.eq(Stamina.Max(100, 2, 5, 10), 240, "Gold doubles base only")
+	t.test("income uses the new variant multipliers (Gold 1.25x, Rainbow 1.75x)", function()
+		-- base 10, 4 stars (2x), biome 1.5x
+		t.near(Income.PerSecond(10, Rarity.VariantStatMultiplier("Gold"), 4, 1.5), 37.5, EPS)
+		t.near(Income.PerSecond(10, Rarity.VariantStatMultiplier("Rainbow"), 4, 1.5), 52.5, EPS)
+	end)
+
+	t.test("max stamina = base x variant x (1 + 1% x (level - 1))", function()
+		t.near(Stamina.Max(100, 1, 1), 100, EPS, "level 1 has no bonus")
+		t.near(Stamina.Max(100, 1, 5), 104, EPS, "4 levels x 1%")
+		t.near(Stamina.Max(100, 1, 11), 110, EPS, "additive, not compounded (compounded would be 110.46)")
+		t.near(Stamina.Max(100, 1.25, 5), 130, EPS, "Gold applied before level bonus")
+		t.near(Stamina.Max(100, 1.75, 50), 260.75, EPS, "Rainbow at level 50")
+	end)
+
+	t.test("speed = base x variant x (1 + 0.1% x (level - 1))", function()
+		t.near(Speed.Max(32, 1, 1), 32, EPS, "level 1 has no bonus")
+		t.near(Speed.Max(32, 1, 11), 32.32, EPS, "10 levels x 0.1%")
+		t.near(Speed.Max(32, 1.25, 1), 40, EPS, "Gold")
+		t.near(Speed.Max(32, 1.75, 50), 32 * 1.75 * 1.049, EPS, "Rainbow at level 50")
+	end)
+
+	t.test("speed and stamina for a real animal fail loudly while base stats are undecided", function()
+		local animal = { Species = "TestCritter", Variant = "Gold", Level = 1 }
 		t.errors(function()
-			Stamina.Max(100, 1, 0, 10)
-		end)
+			Speed.ForAnimal(animal)
+		end, "OPEN QUESTION")
+		t.errors(function()
+			Stamina.ForAnimal(animal)
+		end, "OPEN QUESTION")
+	end)
+
+	t.test("course config matches the approved dimensions", function()
+		t.eq(CourseConfig.SegmentsPerBiome, 5)
+		t.eq(CourseConfig.BaselineRidingSpeed, 32)
+		t.eq(CourseConfig.SegmentLengthStuds, CourseConfig.BaselineRidingSpeed * CourseConfig.SegmentTargetSeconds, "576 = 32 x 18")
+		t.eq(CourseConfig.BiomeLengthStuds, CourseConfig.SegmentsPerBiome * CourseConfig.SegmentLengthStuds, "2,880 = 5 x 576")
+		t.eq(CourseConfig.BiomeLengthStuds / CourseConfig.BaselineRidingSpeed, 90, "about 90 s per biome")
+		t.truthy(CourseConfig.CorridorWidthStuds - 2 * CourseConfig.MaxBushWidthStuds >= 74, "playable centre >= 74 studs")
+		t.eq(CourseConfig.MinAnimalsPerSegment, 1)
+		t.eq(CourseConfig.MaxAnimalsPerSegment, 3)
+	end)
+
+	t.test("test mount (100 stamina) reaches ~864 studs, about halfway through Segment 2", function()
+		local reach = Stamina.MaxDistance(MountConfig.TestMountStamina, MountConfig.StaminaPerStud)
+		t.near(reach, 864, 1e-6, "reach in studs")
+		t.near(reach / CourseConfig.SegmentLengthStuds, 1.5, 1e-9, "1.5 segments = mid Segment 2")
+		t.near(reach / CourseConfig.BaselineRidingSpeed, 27, 1e-6, "about 27 s at 32 studs/s")
 	end)
 
 	t.test("stamina drains by distance and converts back to distance", function()

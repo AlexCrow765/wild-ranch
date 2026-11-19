@@ -74,7 +74,7 @@ function Rarity.VariantStatMultiplier(variant: string): number
 	local multiplier = (RarityConfig.VariantStatMultiplier :: any)[variant]
 	assert(
 		multiplier ~= nil,
-		`OPEN QUESTION: no stat multiplier set for variant "{variant}" (Rainbow is 3x or 4x - designer to decide)`
+		`no stat multiplier set for variant "{variant}"`
 	)
 	return multiplier
 end

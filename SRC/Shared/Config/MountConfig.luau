@@ -1,12 +1,17 @@
 --!strict
 --[[
 	MountConfig
-	Mount leveling and stamina.
+	Mount leveling, speed and stamina.
 
-	Source: Wild_Ranch_Complete_Design_Notes.docx, section 2.F (LOCKED).
+	Sources: design notes section 2.F, as superseded by designer decisions of 2026-11-18
+	(see "Designer decisions that supersede the design notes" in ARCHITECTURE.md):
 	- Leveling is bought with coins (no XP).
-	- Each level adds a FIXED amount of stamina; it does not change income or stars.
-	- Stamina drains by distance traveled, not time. Speed is not a mount stat.
+	- Each species has its own base speed and base stamina (SpeciesConfig).
+	- Each level gained adds a percentage of the (variant-adjusted) base stat, never compounded:
+	    Speed   = Base Speed   x Variant x (1 + SpeedGrowthPerLevel   x (Level - 1))
+	    Stamina = Base Stamina x Variant x (1 + StaminaGrowthPerLevel x (Level - 1))
+	- Stars only set the maximum level (and income); they do not change speed or stamina.
+	- Stamina drains by distance traveled, not time.
 ]]
 
 local MountConfig = {}
@@ -24,9 +29,21 @@ MountConfig.MaxLevelByStars = table.freeze({
 	[5] = 50,
 })
 
--- OPEN QUESTIONS (needed by Phase 3/8):
--- MountConfig.StaminaPerLevel        fixed stamina added per level
--- MountConfig.StaminaPerStud         stamina consumed per stud traveled
+-- Fraction of base stat gained per level above StartingLevel (same for every species).
+MountConfig.SpeedGrowthPerLevel = 0.001 -- +0.1% of base speed per level
+MountConfig.StaminaGrowthPerLevel = 0.01 -- +1% of base stamina per level
+
+-- Stamina consumed per stud traveled.
+-- PROVISIONAL prototype value (designer, 2026-11-18): 100 stamina / 864 studs, so a 100-stamina
+-- mount reaches about halfway through Segment 2. Must be validated in Studio; not final balance.
+MountConfig.StaminaPerStud = 100 / 864
+
+-- Temporary Phase 3 test mount (removed when Phase 8 mount selection lands).
+-- It rides at CourseConfig.BaselineRidingSpeed.
+MountConfig.TestMountStamina = 100
+
+-- OPEN QUESTIONS (needed by Phase 8):
 -- MountConfig.LevelCost              coin price per level
+-- which animal the starter mount is (its reach target is ~864 studs)
 
 return table.freeze(MountConfig)
