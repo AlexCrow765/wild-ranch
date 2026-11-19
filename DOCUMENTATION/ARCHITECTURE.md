@@ -157,6 +157,35 @@ build phase – it belongs to Phase 13. Phase order is fixed.
 
 ---
 
+## Open design decisions (by phase that needs them)
+
+These are undecided in the design notes. Each must be decided by the designer **before** the
+phase that depends on it is implemented. Until then the config value stays unset and any code
+that needs it fails with an `OPEN QUESTION` error. Remove a row once decided and log it below.
+
+| Needed by | Decision |
+|---|---|
+| Phase 3 | Shared course for all players vs. a private course copy per player |
+| Phase 3 | Starter mount for new players (they own no animals) |
+| Phase 3 | Obstacles and jumping: the doc lists "hits an obstacle" as a failure and mentions jumping, but neither is defined |
+| Phase 3 | Segments per biome (the multiplier chart implies 5), segment length, corridor width |
+| Phase 3 | Stamina consumed per stud; temporary test mount's stamina |
+| Phase 4 | Species list per biome and spawn weights by distance |
+| Phase 4 | Animal count per segment: equal chance of 3, 4 or 5? |
+| Phase 4 | Bush emergence trigger distance; flee speed/turning/aggression; whether Gold/Rainbow escape faster |
+| Phase 5 | Yellow/red ring radii, lasso trigger, lasso tiers and prices |
+| Phase 6 | Taming balance concern (two correct inputs inside the grace period always tame) – keep or adjust |
+| Phase 7 | **Rainbow stat multiplier (3× or 4×)** |
+| Phase 7 | **Species base income**; **biome income multipliers** |
+| Phase 7 | Starting coins/gems, inventory and ranch capacities, pen milestones, offline income |
+| Phase 8 | **Species base stamina**, stamina per level, mount level prices |
+| Phase 9 | Biome unlock requirements, starting-area shop items and prices |
+| Phase 10 | Journal milestone rewards |
+| Phase 11 | Gem retry cost, Robux products and prices, quests |
+| Phase 12 | How "rarest catch" is ranked; whether "money earned" means lifetime earnings |
+
+---
+
 ## Implementation decision log
 - 2026-11-15 – Use Rojo with file-based source in `SRC/` (designer approved).
 - 2026-11-15 – Designer refinements adopted: dedicated animal data structure; seeded,
@@ -178,3 +207,6 @@ build phase – it belongs to Phase 13. Phase order is fixed.
 - 2026-11-18 – *Interpretation:* the Gold/Rainbow multiplier applies to a species' **base**
   stamina; the fixed per-level stamina bonus is added on top and is not multiplied. Level 1 has
   no bonus. All random rolls draw from arrays in a fixed order so a seed always reproduces.
+- 2026-11-18 – Review follow-up: rules reject NaN/infinite/negative weights, non-positive or
+  non-finite stamina rates and amounts, and non-finite taming time steps; edge-case tests added
+  for invalid weights, stamina rates, star ratings and inputs after a finished tame.

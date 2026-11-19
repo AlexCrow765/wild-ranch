@@ -16,6 +16,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local TamingConfig = require(Shared:WaitForChild("Config"):WaitForChild("TamingConfig"))
+local Validate = require(Shared:WaitForChild("Util"):WaitForChild("Validate"))
 
 export type Result = "Tamed" | "Failed"
 
@@ -56,6 +57,7 @@ end
 
 -- Moves time forward by dt seconds, draining only the part after the grace period.
 function TamingMeter.Advance(state: State, dt: number)
+	assert(Validate.IsFiniteNumber(dt), `dt must be a finite number, got {tostring(dt)}`)
 	if state.Result ~= nil or dt <= 0 then
 		return
 	end

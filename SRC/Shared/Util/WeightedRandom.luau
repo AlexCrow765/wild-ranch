@@ -7,14 +7,19 @@
 	guaranteed, and a seeded run must make the same picks in the same order every time.
 ]]
 
+local Validate = require(script.Parent:WaitForChild("Validate"))
+
 export type Entry<T> = { value: T, weight: number }
 
 local WeightedRandom = {}
 
 function WeightedRandom.Pick<T>(rng: Random, entries: { Entry<T> }): T
 	local total = 0
-	for _, entry in entries do
-		assert(entry.weight >= 0, "weights must not be negative")
+	for index, entry in entries do
+		assert(
+			Validate.IsFiniteNumber(entry.weight) and entry.weight >= 0,
+			`invalid weight {tostring(entry.weight)} at entry {index}: weights must be finite numbers >= 0`
+		)
 		total += entry.weight
 	end
 	assert(total > 0, "weights must add up to more than 0")
