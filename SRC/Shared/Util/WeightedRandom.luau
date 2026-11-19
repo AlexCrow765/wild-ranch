@@ -22,6 +22,8 @@ function WeightedRandom.Pick<T>(rng: Random, entries: { Entry<T> }): T
 		)
 		total += entry.weight
 	end
+	-- Individually finite weights can still overflow to infinity when added together.
+	assert(Validate.IsFiniteNumber(total), `total weight {tostring(total)} is not finite (weights too large)`)
 	assert(total > 0, "weights must add up to more than 0")
 
 	local roll = rng:NextNumber() * total -- [0, total)

@@ -37,6 +37,15 @@ return function(t)
 		end
 	end)
 
+	t.test("weighted pick rejects finite weights whose total overflows to infinity", function()
+		local rng = Random.new(1)
+		local big = 1e308
+		t.truthy(Validate.IsFiniteNumber(big), "each weight is finite on its own")
+		t.errors(function()
+			WeightedRandom.Pick(rng, { { value = "a", weight = big }, { value = "b", weight = big } })
+		end, "not finite")
+	end)
+
 	t.test("weighted pick rejects all-zero weights and an empty list", function()
 		local rng = Random.new(1)
 		t.errors(function()

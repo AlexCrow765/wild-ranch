@@ -176,7 +176,7 @@ that needs it fails with an `OPEN QUESTION` error. Remove a row once decided and
 
 | Needed by | Decision |
 |---|---|
-| Phase 3 | Obstacles and jumping: the doc lists "hits an obstacle" as a failure and mentions jumping, but neither is defined |
+| Before they are added | Obstacles and jumping: what they are, placement, jump controls. **Excluded from Phase 3** (designer decision 2026-11-18); may relate to aggressive animals (Phase 4) |
 | Phase 3 | Segments per biome (the multiplier chart implies 5), segment length, corridor width |
 | Phase 3 | Stamina consumed per stud; temporary test mount's stamina |
 | Phase 4 | Species list per biome and spawn weights by distance |
@@ -224,3 +224,7 @@ that needs it fails with an `OPEN QUESTION` error. Remove a row once decided and
   pass through each other without affecting steering or targeting; the server validates each
   player's encounters and catches independently (designer decision).
 - 2026-11-18 – Starter mount moved to "needed by Phase 8": Phase 3 rides the temporary test mount.
+- 2026-11-18 – Obstacles and jumping are excluded from Phase 3 until designed; runs end only by
+  stamina reaching 0 or a failed tame. Riding code leaves room to add them later (designer decision).
+- 2026-11-18 – Review follow-up (ChatGPT on df339fe): WeightedRandom also rejects a total weight
+  that overflows to infinity; edge-case test added.
