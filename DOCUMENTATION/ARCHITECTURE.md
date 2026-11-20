@@ -204,17 +204,20 @@ build phase – it belongs to Phase 13. Phase order is fixed.
 - [x] Star/variant/species rolls with normalization, income, stamina, level caps, taming math
 - [x] Test: automated tests + large roll simulations match the design doc's odds
 
-### Phase 3 – Grey-box course & riding
-- [ ] Grey-box Plains: starting area, starting line, 5 × 576-stud segments, 100-stud corridor,
+### Phase 3 – Grey-box course & riding ✅
+- [x] Grey-box Plains: starting area, starting line, 5 × 576-stud segments, 100-stud corridor,
       bush strips (up to 13 studs each side) behind invisible collision boundaries (plain parts)
-- [ ] Auto-forward riding at 32 studs/s with left/right steering on PC, mobile and gamepad;
+- [x] Auto-forward riding at 32 studs/s with left/right steering on PC, mobile and gamepad;
       riders pass through each other
-- [ ] **Temporary test mount** with 100 stamina (removed in Phase 8)
-- [ ] Stamina drains by distance (provisional ≈ 0.11574/stud); collapse at 0 ends the run;
+- [x] **Temporary test mount** with 100 stamina (removed in Phase 8)
+- [x] Stamina drains by distance (provisional ≈ 0.11574/stud); collapse at 0 ends the run;
       return to ranch
-- [ ] Test: the test mount runs out at ≈ 864 studs (about halfway through Segment 2); tune the
+- [x] Test: the test mount runs out at ≈ 864 studs (about halfway through Segment 2); tune the
       drain rate in Studio if needed
-- [ ] Test: ride until stamina runs out on all three input types
+- [x] Test: ride until stamina runs out on all three input types
+- Studio results (2026-11-19): 58 automated tests pass; collapse at 864.3 and 865.1 studs
+  (Segment 2) with 0 rejected samples; PC, gamepad, mobile (device emulator) and two-player
+  checks confirmed by the designer. Real-phone test still to do. Drain rate 0.11574/stud kept.
 - Not in this phase: terrain, real models, animations, effects
 
 ### Phase 4 – Run generation & encounters
@@ -358,3 +361,17 @@ that needs it fails with an `OPEN QUESTION` error. Remove a row once decided and
   level), provisional `StaminaPerStud = 100/864`, `TestMountStamina = 100`; `CourseConfig` course
   dimensions and 1–3 animals per segment; `SpeciesConfig` gains `BaseSpeed`; new `LevelScaling`
   and `Speed` rules; `Stamina.Max` uses the percentage formula; tests updated.
+- 2026-11-18 – Phase 3 implementation choices (pending designer review and Studio tests):
+  grey-box world is built by `WorldService` from `CourseConfig` at server start; an existing
+  Workspace part named `StartingFloor` is reused as-is (else a 250 × 1 × 100 floor is created) and
+  the course is laid out from it (floor LookVector = riding direction, front edge = starting
+  line). `RunSessionService` owns run state (Ranch → StartingArea → Riding → Collapsed → Ranch);
+  the client (`RideController`) only steers its own character. The server's speed cap is
+  measured from run start (speed × elapsed × 1.25 + 6 studs), so bursty network updates are not
+  flagged; riders further ahead than 20 studs or outside the corridor are moved back. Riders are
+  in the `Riders` collision group, which does not collide with itself. Approved provisional
+  values in `CourseConfig`: steer speed 16 studs/s, 3 s "Out of stamina" message.
+- 2026-11-19 – Phase 3 accepted by the designer after Studio testing. Provisional drain of
+  100/864 stamina per stud confirmed (collapses at ≈ 864 studs). Fixed during testing: the
+  client no longer waits for Roblox's `PlayerModule` (absent in the test place). Added a
+  Studio-only `speed` debug command for faster testing; the approved 32 studs/s is unchanged.

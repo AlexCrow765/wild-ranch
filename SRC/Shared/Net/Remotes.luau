@@ -25,6 +25,13 @@ local Definitions: { [string]: Kind } = {
 	-- Phase 1: data
 	PlayerDataSnapshot = "Event", -- server -> client: full copy of the player's own data
 	GetPlayerData = "Function", -- client -> server: fetch own data on start-up
+
+	-- Phase 3: runs
+	RunState = "Event", -- server -> client: run state changes (Ranch/StartingArea/Riding/Collapsed)
+	RunStats = "UnreliableEvent", -- server -> client: stamina + progress, ~10 times per second
+	GetRunState = "Function", -- client -> server: current run state on start-up
+	RequestTravelToBiome = "Event", -- client -> server: temporary "Ride Plains" button (until Phase 9)
+	RequestReturnToRanch = "Event", -- client -> server: only accepted in a starting area
 }
 
 local FOLDER_NAME = "Remotes"

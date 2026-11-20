@@ -21,6 +21,7 @@ local ServerStorage = game:GetService("ServerStorage")
 local DataService = require(script.Parent:WaitForChild("DataService"))
 local AnimalService = require(script.Parent:WaitForChild("AnimalService"))
 local CurrencyService = require(script.Parent:WaitForChild("CurrencyService"))
+local RunSessionService = require(script.Parent:WaitForChild("RunSessionService"))
 
 local DebugService = {
 	LoadOrder = 1000,
@@ -36,7 +37,10 @@ WildRanchDebug commands:
   place <player> <animalId> <true|false>
   level <player> <animalId> <level>
   coins <player> <amount>       (negative to spend)
-  gems <player> <amount>        (negative to spend)]]
+  gems <player> <amount>        (negative to spend)
+  runinfo                                        every player's run state, progress and stamina
+  goto <player> <distance>      move a riding player to a forward distance (studs)
+  speed <player> <studsPerSec|reset>   test-only riding speed (now and for later rides)]]
 
 local function findPlayer(name: string?): Player?
 	if name == nil then
@@ -87,6 +91,8 @@ local function run(commandLine: string): string
 			return "ServerStorage.Tests.TestRunner not found (is Rojo connected?)"
 		end
 		return (require :: any)(runner).Run()
+	elseif command == "runinfo" then
+		return RunSessionService.DebugInfo()
 	elseif command == "report" then
 		local lines = { `DataStore state: {DataService.StoreState()}` }
 		for _, player in Players:GetPlayers() do
@@ -116,6 +122,24 @@ local function run(commandLine: string): string
 	elseif command == "level" then
 		local ok, reason = AnimalService.SetLevel(player, args[3], tonumber(args[4]) :: number)
 		return if ok then "level set" else `level failed: {reason}`
+	elseif command == "goto" then
+		local distance = tonumber(args[3])
+		if distance == nil then
+			return "distance must be a number"
+		end
+		local ok, reason = RunSessionService.DebugSetProgress(player, distance)
+		return if ok then `moved {player.Name} to {distance} studs` else `goto failed: {reason}`
+	elseif command == "speed" then
+		local value = args[3]
+		local speed = if value == "reset" then nil else tonumber(value)
+		if value ~= "reset" and speed == nil then
+			return 'speed must be a number of studs/s, or "reset"'
+		end
+		local ok, reason = RunSessionService.DebugSetSpeed(player, speed)
+		if not ok then
+			return `speed failed: {reason}`
+		end
+		return if speed then `{player.Name} rides at {speed} studs/s (test only)` else `{player.Name} back to the normal riding speed`
 	elseif command == "coins" then
 		return changeCurrency(player, "Coins", args[3])
 	elseif command == "gems" then
