@@ -176,6 +176,32 @@ until the .docx is updated.
 | Gold 2× base stats; Rainbow 3× or 4× (§2.D) | Gold 1.25×, Rainbow 1.75× on speed, stamina and income |
 | Animals run just ahead of the player at a pace that lets the player choose (§2.E) | Species-specific speeds and behaviours; some species are substantially harder to pursue |
 
+### Blender → Roblox asset scale (designer convention, verified 2026-11-19)
+- **1 Blender unit = 1 Roblox stud.** Model at the real stud size; never rely on export scaling.
+- Keep transforms clean before export: scale (1, 1, 1), rotation (0, 0, 0), origin placed
+  deliberately (e.g. geometric centre).
+- **Blender FBX export settings** (Roblox-recommended; tested):
+
+  | Setting | Value |
+  |---|---|
+  | Limit to | Selected objects, Mesh |
+  | Scale | 1.0 |
+  | Apply Unit | on |
+  | Apply Scalings | **FBX Unit Scale** |
+  | Forward / Up | **Z Forward / Y Up** |
+  | Apply Transform | off |
+  | Apply Modifiers | on |
+  | Smoothing | Face |
+  | Leaf bones / Animation / Custom properties / Embed textures | off |
+
+  Blender scene left at its defaults (Metric, Unit Scale 1.0). The exported FBX reports
+  UnitScaleFactor 100, which Studio imports correctly with these settings.
+- **Studio 3D Importer:** Scale Unit **Stud**, World Forward **Front**, World Up **Top**.
+- **Verified:** `TEST_10_STUD_CUBE` (10 × 10 × 10 Blender units) imported as a MeshPart of
+  Size **10, 10, 10** studs (Model scale 1, pivot Y = 5 on a Y = 0 surface).
+- Roblox limits to respect: ≤ 20,000 triangles per mesh, no N-gons, no zero-thickness geometry.
+- Test exports live in `ASSETS/_ScaleTest/` and are not part of the game code.
+
 ### Monetization
 - `MonetizationService` (gem products, Robux, `ProcessReceipt`) stays in the architecture but is
   **not implemented until Phase 11**, isolated so a purchase failure can never block the core loop.
@@ -375,3 +401,6 @@ that needs it fails with an `OPEN QUESTION` error. Remove a row once decided and
   100/864 stamina per stud confirmed (collapses at ≈ 864 studs). Fixed during testing: the
   client no longer waits for Roblox's `PlayerModule` (absent in the test place). Added a
   Studio-only `speed` debug command for faster testing; the approved 32 studs/s is unchanged.
+- 2026-11-19 – Blender → Roblox scale convention verified: 1 Blender unit = 1 stud with FBX
+  export Apply Scalings = FBX Unit Scale, Scale 1.0, Z Forward / Y Up, and Studio Scale Unit =
+  Stud. A 10 × 10 × 10 test cube imported as Size 10, 10, 10 (designer convention).
