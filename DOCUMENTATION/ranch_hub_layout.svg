@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="1060" viewBox="0 0 760 1060" font-family="Arial, sans-serif">
+<rect width="760" height="1060" fill="#f4f1ea"/>
+<text x="20" y="28" font-size="20" font-weight="bold" fill="#333">Wild Ranch – Ranch Hub (proposed grey-box layout, top-down)</text>
+<text x="20" y="50" font-size="13" fill="#555">Scale: 1 px = 0.8 studs. Plot 120×120, plot centres at r=195, 72° apart; plaza r=120; runway 40×160.</text>
+<circle cx="380.0" cy="560.0" r="343.8" fill="#8ccf5f" stroke="#5f9e3c" stroke-width="2"/>
+<polygon points="223.8,210.0 536.2,210.0 536.2,85.0 223.8,85.0" fill="#a8c98a" stroke="#555" stroke-width="2" />
+<text x="380.0" y="141.2" font-size="13" text-anchor="middle" fill="#222">Plains starting floor 250×100 (unchanged)</text>
+<line x1="333.8" y1="85.0" x2="426.2" y2="85.0" stroke="#d33" stroke-width="4"/>
+<text x="380.0" y="77.0" font-size="12" text-anchor="middle" fill="#d33">starting line → Plains course</text>
+<circle cx="380.0" cy="560.0" r="150.0" fill="#e2c48f" stroke="#a9834a" stroke-width="3"/>
+<text x="380.0" y="564.0" font-size="13" text-anchor="middle" fill="#6b4f22">open tan checkerboard plaza (r=120)</text>
+<text x="380.0" y="580.0" font-size="11" text-anchor="middle" fill="#6b4f22">no centrepiece · neutral spawn</text>
+<polygon points="355.0,410.0 405.0,410.0 405.0,210.0 355.0,210.0" fill="#e2c48f" stroke="#a9834a" stroke-width="2" />
+<text x="384.0" y="310.0" font-size="12" text-anchor="middle" fill="#6b4f22" transform="rotate(-90 384.0 310.0)">RUNWAY 40×160</text>
+<polygon points="418.5,379.4 539.9,467.6 628.0,346.2 506.7,258.0" fill="#9b6b3f" stroke="#6e4a2a" stroke-width="2" />
+<polygon points="431.4,370.2 544.6,452.5 621.0,347.3 507.8,265.0" fill="none" stroke="#e9d6b5" stroke-width="2" stroke-dasharray="5,4"/>
+<polygon points="490.0,344.8 550.7,388.9 594.8,328.2 534.1,284.1" fill="#b98a5a" stroke="#4a2f17" stroke-width="2" />
+<circle cx="443.3" cy="409.0" r="6.2" fill="none" stroke="#f2c400" stroke-width="4"/>
+<rect x="502.4" y="447.1" width="7" height="7" fill="#7a5230"/>
+<circle cx="483.6" cy="417.4" r="3.5" fill="#fff" stroke="#333"/>
+<text x="526.2" y="404.8" font-size="13" font-weight="bold" text-anchor="middle" fill="#fff">Plot 1</text>
+<polygon points="563.7,540.8 517.3,683.5 660.0,729.8 706.3,587.2" fill="#9b6b3f" stroke="#6e4a2a" stroke-width="2" />
+<polygon points="576.4,550.2 533.1,683.4 656.8,723.5 700.0,590.4" fill="none" stroke="#e9d6b5" stroke-width="2" stroke-dasharray="5,4"/>
+<polygon points="618.7,598.1 595.5,669.4 666.8,692.6 690.0,621.3" fill="#b98a5a" stroke="#4a2f17" stroke-width="2" />
+<circle cx="543.2" cy="573.6" r="6.2" fill="none" stroke="#ff6fb5" stroke-width="4"/>
+<rect x="519.5" y="642.4" width="7" height="7" fill="#7a5230"/>
+<circle cx="547.6" cy="614.5" r="3.5" fill="#fff" stroke="#333"/>
+<text x="616.6" y="682.9" font-size="13" font-weight="bold" text-anchor="middle" fill="#fff">Plot 2</text>
+<polygon points="455.0,728.8 305.0,728.8 305.0,878.8 455.0,878.8" fill="#9b6b3f" stroke="#6e4a2a" stroke-width="2" />
+<polygon points="450.0,743.8 310.0,743.8 310.0,873.8 450.0,873.8" fill="none" stroke="#e9d6b5" stroke-width="2" stroke-dasharray="5,4"/>
+<polygon points="417.5,798.8 342.5,798.8 342.5,873.8 417.5,873.8" fill="#b98a5a" stroke="#4a2f17" stroke-width="2" />
+<circle cx="417.5" cy="719.4" r="6.2" fill="none" stroke="#3cc8e8" stroke-width="4"/>
+<rect x="339.0" y="719.0" width="7" height="7" fill="#7a5230"/>
+<circle cx="380.0" cy="736.2" r="3.5" fill="#fff" stroke="#333"/>
+<text x="380.0" y="854.8" font-size="13" font-weight="bold" text-anchor="middle" fill="#fff">Plot 3</text>
+<polygon points="242.7,683.5 196.3,540.8 53.7,587.2 100.0,729.8" fill="#9b6b3f" stroke="#6e4a2a" stroke-width="2" />
+<polygon points="226.9,683.4 183.6,550.2 60.0,590.4 103.2,723.5" fill="none" stroke="#e9d6b5" stroke-width="2" stroke-dasharray="5,4"/>
+<polygon points="164.5,669.4 141.3,598.1 70.0,621.3 93.2,692.6" fill="#b98a5a" stroke="#4a2f17" stroke-width="2" />
+<circle cx="240.0" cy="644.9" r="6.2" fill="none" stroke="#5cd65c" stroke-width="4"/>
+<rect x="210.4" y="571.1" width="7" height="7" fill="#7a5230"/>
+<circle cx="212.4" cy="614.5" r="3.5" fill="#fff" stroke="#333"/>
+<text x="143.4" y="682.9" font-size="13" font-weight="bold" text-anchor="middle" fill="#fff">Plot 4</text>
+<polygon points="220.1,467.6 341.5,379.4 253.3,258.0 132.0,346.2" fill="#9b6b3f" stroke="#6e4a2a" stroke-width="2" />
+<polygon points="215.4,452.5 328.6,370.2 252.2,265.0 139.0,347.3" fill="none" stroke="#e9d6b5" stroke-width="2" stroke-dasharray="5,4"/>
+<polygon points="209.3,388.9 270.0,344.8 225.9,284.1 165.2,328.2" fill="#b98a5a" stroke="#4a2f17" stroke-width="2" />
+<circle cx="256.0" cy="453.1" r="6.2" fill="none" stroke="#ff9a3c" stroke-width="4"/>
+<rect x="311.3" y="403.0" width="7" height="7" fill="#7a5230"/>
+<circle cx="276.4" cy="417.4" r="3.5" fill="#fff" stroke="#333"/>
+<text x="233.8" y="404.8" font-size="13" font-weight="bold" text-anchor="middle" fill="#fff">Plot 5</text>
+<polygon points="410.6,438.6 422.5,442.3 428.4,423.2 416.4,419.5" fill="#c0392b" stroke="#7b241c" stroke-width="2" />
+<text x="396.6" y="446.6" font-size="11" fill="#7b241c" text-anchor="end">permanent merchant cart</text>
+<polygon points="349.4,681.4 337.5,677.7 331.6,696.8 343.6,700.5" fill="none" stroke="#8e44ad" stroke-width="2" stroke-dasharray="4,3"/>
+<text x="365.4" y="675.4" font-size="11" fill="#8e44ad">traveling merchant marker</text>
+<g font-size="12" fill="#333">
+<rect x="20" y="940" width="14" height="14" fill="#9b6b3f"/><text x="40" y="952">dirt plot (fixed 120×120, no outer fence)</text>
+<rect x="20" y="962" width="14" height="14" fill="#b98a5a" stroke="#4a2f17" stroke-width="2"/><text x="40" y="974">initial wooden pen 60×60 (gate faces plaza)</text>
+<rect x="20" y="984" width="14" height="14" fill="none" stroke="#b9a07a" stroke-dasharray="4,3"/><text x="40" y="996">room for pen expansion (max ≈ 112×104)</text>
+<circle cx="27" cy="1013" r="6" fill="none" stroke="#f2c400" stroke-width="3"/><text x="40" y="1018">collection pad (plot colour), outside the dirt</text>
+<rect x="380" y="940" width="10" height="10" fill="#7a5230"/><text x="396" y="950">ownership sign (username)</text>
+<circle cx="385" cy="967" r="4" fill="#fff" stroke="#333"/><text x="396" y="971">home point (all returns land here)</text>
+<text x="380" y="996">Plots 1–5 at 36°,108°,180°,252°,324°;</text><text x="380" y="1012">runway in the 0° gap between Plots 5 and 1.</text>
+</g>
+</svg>
