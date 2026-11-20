@@ -1,6 +1,6 @@
 # Ranch Hub – Design & Implementation Proposal (rev. 2)
 
-Status: **proposal for designer + ChatGPT review. Nothing in this document is implemented.**
+Status: **approved to proceed (2026-11-20). Stage 1 (HubConfig, HubLayout, geometry tests) implemented, pending review; Stages 2–5 not started.**
 Last updated: 2026-11-20. Layout diagram: [`ranch_hub_layout.svg`](ranch_hub_layout.svg).
 
 Labels used below:
@@ -241,11 +241,11 @@ passive income, pen upgrades, shop functionality at the cart, traveling-merchant
 ## 9. Remaining open decisions
 | # | Decision | Needed by |
 |---|---|---|
-| **O1** | 72° plot spacing and a "sixth position" for the runway can't both be evenly spaced. **Proposed:** the runway sits in the gap between Plot 5 and Plot 1 (0° line). Confirm. | Stage 1 |
-| **O2** | Approve the recommended dimensions: plot centres r = 195 (instead of ≈ 140), plaza r = 120, runway 40 × 160, grass r = 275, merchant spots at r = 108 / 17° and 197° (all provisional). | Stage 1 |
+| ~~O1~~ | **DECIDED 2026-11-20:** runway in the 0° gap between Plot 5 and Plot 1; plots stay 72° apart; the runway is not a sixth evenly spaced slot. | Stage 1 |
+| ~~O2~~ | **DECIDED (provisional) 2026-11-20:** plot 120 × 120, pen 60 × 60, plot centres r = 195, plaza r = 120, runway 40 × 160, grass r = 275 – adjustable values. Merchant spots (r = 108 at 17° / 197°) were not listed in the approval and stay proposal values in config. | Stage 1 |
 | **O3** | **The "existing collapse/fly-off sequence" does not exist yet**: today a collapse freezes the rider and shows "Out of stamina" for 3 s. Should the mount-collapse + fly-off animation be built now (grey-box), in Phase 6, or in Phase 13 (polish)? | Stage 5 |
 | O4 | White flash: duration/feel (recommend ~0.3 s fade-in, ~0.5 s fade-out, teleport at full white). | Stage 5 |
-| O5 | Pen placement inside the plot: anchored at the back, growing toward the entrance (recommended) vs centred. | Stage 1 |
+| ~~O5~~ | **DECIDED 2026-11-20:** pen anchored ~4 studs from the back, grows toward the entrance and sideways, front entrance area kept; initial 60 × 60, max ≈ 112 × 104 (geometry-tested). | Stage 1 |
 | O6 | Which side of the entrance gets the sign vs the collection pad (proposed: sign left, pad right, same for every plot). | Stage 2 |
 | O7 | Defensive "no free plot" behaviour (should never happen with Max Players = 5): recommend log an error and keep the player in the plaza with a message, rather than kicking. | Stage 3 |
 | O8 | Studio-adjustable positions – see risk R1. Choose: (a) edit `HubConfig` values only, or (b) **also** let Studio-placed override parts (e.g. `Workspace.HubOverrides.MerchantCart`) replace generated positions (recommended for the cart and traveling marker). | Stage 2 |

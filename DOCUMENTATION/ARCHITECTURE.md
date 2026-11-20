@@ -267,6 +267,20 @@ build phase – it belongs to Phase 13. Phase order is fixed.
   checks confirmed by the designer. Real-phone test still to do. Drain rate 0.11574/stud kept.
 - Not in this phase: terrain, real models, animations, effects
 
+### Phase 3B – Ranch Hub environment & plot ownership
+Plan and decisions: `DOCUMENTATION/RANCH_HUB_PROPOSAL.md` (diagram: `ranch_hub_layout.svg`).
+- [x] Stage 1: `HubConfig` + pure `HubLayout` (+ `Geometry2D`) with automated geometry tests –
+      plot positions/clearances, runway alignment, pen sizes, merchant footprints, determinism,
+      default and rotated/offset starting floor
+      Studio (2026-11-20): 106 automated tests pass (16 hub geometry tests).
+- [ ] Stage 2: build the grey-box hub (grass, checkerboard plaza, runway, 5 dirt plots, pens,
+      signs, pads, merchant spots, hub-edge walls, floor back-wall opening) + Studio override parts
+- [ ] Stage 3: plot assignment, ownership signs, release on leave (`PlotAssignment`, `PlotService`)
+- [ ] Stage 4: walking transitions hub ↔ starting floor (remove the "Ride Plains" teleport)
+- [ ] Stage 5: return to the player's own plot (`ReturnHome`) for every run-ending case available
+- Not in this phase: animals, inventory, income, pen upgrades, shop, traveling-merchant event,
+  leaderboards
+
 ### Phase 4 – Run generation & encounters
 - [ ] Reachability → segments generated; seeded RunPlanner; 1–3 animals per segment in
       randomly selected encounter slots; left/right side and emergence position per animal
@@ -452,3 +466,8 @@ that needs it fails with an `OPEN QUESTION` error. Remove a row once decided and
   position (may be up to ~28 studs ahead at 32 studs/s before being moved back). Regression test
   added showing the physical tolerance earns no extra progress or stamina. Phases 4–5 must
   validate emergence, targeting, lasso and catching against accepted progress.
+- 2026-11-20 – Ranch Hub proposal approved to proceed (designer + ChatGPT review of f5fcc7d):
+  O1 runway in the 0° gap between Plot 5 and Plot 1, plots 72° apart; O2 provisional sizes
+  (plot 120 × 120, pen 60 × 60, plot centres r = 195, plaza r = 120, runway 40 × 160, grass
+  r = 275), adjustable in `HubConfig`; O5 pen anchored ~4 studs from the plot back, growing toward
+  the entrance and sideways (max ≈ 112 × 104). New Phase 3B added; Stage 1 authorized.
