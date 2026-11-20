@@ -18,6 +18,7 @@ local UserInputService = game:GetService("UserInputService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local CourseLayout = require(Shared:WaitForChild("Rules"):WaitForChild("CourseLayout"))
 local CourseConfig = require(Shared:WaitForChild("Config"):WaitForChild("CourseConfig"))
+local HoldTracker = require(Shared:WaitForChild("Util"):WaitForChild("HoldTracker"))
 
 local InputController = require(script.Parent:WaitForChild("InputController"))
 local RideController = require(script.Parent:WaitForChild("RideController"))
@@ -78,20 +79,94 @@ local function button(parent: Instance, name: string, size: UDim2, position: UDi
 	return item
 end
 
+-- Held-button steering. Every touch finger (and the mouse button) is tracked separately:
+-- a hold starts when the input begins on a steer button and ends when that input ends or is
+-- cancelled (wherever it lifts), when it slides off the button, or when steering is cleared.
+local steerHolds = HoldTracker.new()
+local steerButtons: { [string]: TextButton } = {}
+
+local function syncSteer()
+	InputController.SetTouchSteer("Left", HoldTracker.IsHeld(steerHolds, "Left"))
+	InputController.SetTouchSteer("Right", HoldTracker.IsHeld(steerHolds, "Right"))
+end
+
+local function releaseInput(input: InputObject)
+	if HoldTracker.Release(steerHolds, input) then
+		syncSteer()
+	end
+end
+
+local function clearSteer()
+	HoldTracker.Clear(steerHolds)
+	InputController.ClearTouchSteer()
+end
+
+local function isHoldInput(input: InputObject): boolean
+	return input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1
+end
+
 local function steerButton(parent: Instance, side: "Left" | "Right", position: UDim2): TextButton
 	local item = button(parent, `Steer{side}`, UDim2.fromOffset(150, 150), position, if side == "Left" then "◀" else "▶")
 	item.AnchorPoint = Vector2.new(if side == "Left" then 0 else 1, 1)
 	item.AutoButtonColor = true
-	item.MouseButton1Down:Connect(function()
-		InputController.SetTouchSteer(side, true)
+	steerButtons[side] = item
+
+	item.InputBegan:Connect(function(input: InputObject)
+		if not isHoldInput(input) or input.UserInputState ~= Enum.UserInputState.Begin then
+			return
+		end
+		HoldTracker.Press(steerHolds, input, side)
+		syncSteer()
+		-- Ends or cancels wherever the finger/mouse is released.
+		local connection: RBXScriptConnection
+		connection = input:GetPropertyChangedSignal("UserInputState"):Connect(function()
+			local state = input.UserInputState
+			if state == Enum.UserInputState.End or state == Enum.UserInputState.Cancel then
+				connection:Disconnect()
+				releaseInput(input)
+			end
+		end)
 	end)
-	item.MouseButton1Up:Connect(function()
-		InputController.SetTouchSteer(side, false)
-	end)
+
+	-- Mouse: leaving the button ends the hold (same as before).
 	item.MouseLeave:Connect(function()
-		InputController.SetTouchSteer(side, false)
+		for key, held in steerHolds.Holds do
+			if held == side and typeof(key) == "Instance" and (key :: InputObject).UserInputType == Enum.UserInputType.MouseButton1 then
+				releaseInput(key :: InputObject)
+			end
+		end
 	end)
 	return item
+end
+
+-- Global safety nets: an input that ends anywhere, or a finger that slides off its button.
+local function connectSteerSafetyNets()
+	UserInputService.InputEnded:Connect(function(input: InputObject)
+		if isHoldInput(input) then
+			if input.UserInputType == Enum.UserInputType.MouseButton1 then
+				-- The mouse button may come back as a different InputObject: release all mouse holds.
+				for key in steerHolds.Holds do
+					if typeof(key) == "Instance" and (key :: InputObject).UserInputType == Enum.UserInputType.MouseButton1 then
+						HoldTracker.Release(steerHolds, key)
+					end
+				end
+				syncSteer()
+			else
+				releaseInput(input)
+			end
+		end
+	end)
+	UserInputService.TouchMoved:Connect(function(input: InputObject)
+		local side = HoldTracker.ButtonFor(steerHolds, input)
+		local item = side and steerButtons[side]
+		if item then
+			local point = Vector2.new(input.Position.X, input.Position.Y)
+			if not HoldTracker.IsInside(point, item.AbsolutePosition, item.AbsoluteSize) then
+				releaseInput(input)
+			end
+		end
+	end)
+	UserInputService.WindowFocusReleased:Connect(clearSteer)
 end
 
 local function build(): Ui
@@ -175,6 +250,9 @@ local function onState(payload: { [string]: any })
 	ui.StaminaFrame.Visible = riding or collapsed
 	ui.SteerLeft.Visible = riding and UserInputService.TouchEnabled
 	ui.SteerRight.Visible = riding and UserInputService.TouchEnabled
+	if not riding then
+		clearSteer() -- run ended or buttons hidden: no steering can stay held
+	end
 
 	if riding then
 		RideController.Stats = { Stamina = payload.MaxStamina, Progress = 0 }
@@ -211,6 +289,7 @@ end
 
 function HudController:Start()
 	ui = build()
+	connectSteerSafetyNets()
 	RideController.StateChanged:Connect(onState)
 	RideController.StatsChanged:Connect(updateStamina)
 	onState(RideController.Payload.State and RideController.Payload or { State = RideController.State })

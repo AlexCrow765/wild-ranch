@@ -17,6 +17,10 @@
 	  - computes stamina and ends the run at 0.
 	The client only steers its own character (RideController).
 
+	State transitions go through Shared/Rules/RunSessionState, which changes state, biome and
+	run together and bumps the session Token, so a session can never be Riding without a run
+	and stale delayed callbacks are ignored. A respawn or death always returns to Ranch at once.
+
 	Phase 3 uses the temporary test mount (MountConfig.TestMountStamina at the baseline speed).
 	Phase 4 adds the run plan (seeded encounters) at run start.
 ]]
@@ -33,21 +37,14 @@ local MountConfig = require(Config:WaitForChild("MountConfig"))
 local BiomeConfig = require(Config:WaitForChild("BiomeConfig"))
 local CourseLayout = require(Rules:WaitForChild("CourseLayout"))
 local RunProgress = require(Rules:WaitForChild("RunProgress"))
+local RunSessionState = require(Rules:WaitForChild("RunSessionState"))
 local Remotes = require(Shared:WaitForChild("Net"):WaitForChild("Remotes"))
 
 local PlayerService = require(script.Parent:WaitForChild("PlayerService"))
 local WorldService = require(script.Parent:WaitForChild("WorldService"))
 
-export type State = "Ranch" | "StartingArea" | "Riding" | "Collapsed"
-
-type Session = {
-	State: State,
-	Biome: string?,
-	Run: RunProgress.Run?,
-	StatsTimer: number,
-	Token: number, -- changes on every state change; stale delayed callbacks check it
-	DebugSpeed: number?, -- Studio-only riding speed override (DebugService "speed" command)
-}
+export type State = RunSessionState.State
+type Session = RunSessionState.Session
 
 local DEBUG_MAX_SPEED = 500 -- studs/s; sanity limit for the debug override
 
@@ -88,9 +85,8 @@ local function statePayload(session: Session): { [string]: any }
 	return payload
 end
 
-local function setState(player: Player, session: Session, state: State, extra: { [string]: any }?)
-	session.State = state
-	session.Token += 1
+-- Sends the session's current state to its client (after a RunSessionState transition).
+local function notify(player: Player, session: Session, extra: { [string]: any }?)
 	local payload = statePayload(session)
 	if extra then
 		for key, value in extra do
@@ -100,12 +96,15 @@ local function setState(player: Player, session: Session, state: State, extra: {
 	runStateRemote:FireClient(player, payload)
 end
 
-local function removeMount(player: Player)
-	local character = player.Character
+local function removeMountFrom(character: Instance?)
 	local mount = character and character:FindFirstChild(MOUNT_NAME)
 	if mount then
 		mount:Destroy()
 	end
+end
+
+local function removeMount(player: Player)
+	removeMountFrom(player.Character)
 end
 
 -- Grey-box test mount: a plain block welded under the rider. No collision, no mass.
@@ -142,9 +141,8 @@ local function sendToRanch(player: Player, session: Session)
 		root.Anchored = false
 		teleport(root, WorldService.GetHubSpawn())
 	end
-	session.Biome = nil
-	session.Run = nil
-	setState(player, session, "Ranch")
+	RunSessionState.ToRanch(session)
+	notify(player, session)
 end
 
 local function startRun(player: Player, session: Session)
@@ -154,11 +152,11 @@ local function startRun(player: Player, session: Session)
 	end
 	-- Phase 3: temporary test mount (removed when Phase 8 mount selection lands).
 	local speed = session.DebugSpeed or CourseConfig.BaselineRidingSpeed
-	session.Run = RunProgress.new(MountConfig.TestMountStamina, MountConfig.StaminaPerStud, speed)
-	session.StatsTimer = 0
+	local run = RunProgress.new(MountConfig.TestMountStamina, MountConfig.StaminaPerStud, speed)
+	RunSessionState.ToRiding(session, run)
 	attachMount(player, root)
-	setState(player, session, "Riding")
-	print(`[RunSession] {player.Name} started a {session.Biome} run (reach ≈ {math.floor(RunProgress.ReachDistance(session.Run :: RunProgress.Run))} studs)`)
+	notify(player, session)
+	print(`[RunSession] {player.Name} started a {session.Biome} run (reach ≈ {math.floor(RunProgress.ReachDistance(run))} studs)`)
 end
 
 local function collapse(player: Player, session: Session, reason: string)
@@ -170,7 +168,8 @@ local function collapse(player: Player, session: Session, reason: string)
 	local message = if reason == "OutOfStamina"
 		then CourseConfig.CollapseMessage
 		else "End of the course (the next biome arrives in a later phase)"
-	setState(player, session, "Collapsed", {
+	RunSessionState.ToCollapsed(session)
+	notify(player, session, {
 		Reason = reason,
 		Message = message,
 		Seconds = CourseConfig.CollapseMessageSeconds,
@@ -182,7 +181,7 @@ local function collapse(player: Player, session: Session, reason: string)
 
 	local token = session.Token
 	task.delay(CourseConfig.CollapseMessageSeconds, function()
-		if sessions[player] == session and session.Token == token and session.State == "Collapsed" then
+		if sessions[player] == session and RunSessionState.IsCurrent(session, token) and session.State == "Collapsed" then
 			sendToRanch(player, session)
 		end
 	end)
@@ -255,8 +254,8 @@ local function onTravelRequest(player: Player, biomeId: any)
 		return
 	end
 	teleport(root, spawn)
-	session.Biome = biomeId
-	setState(player, session, "StartingArea")
+	RunSessionState.ToStartingArea(session, biomeId)
+	notify(player, session)
 end
 
 local function onReturnRequest(player: Player)
@@ -271,21 +270,46 @@ local function onReturnRequest(player: Player)
 	sendToRanch(player, session)
 end
 
+-- Ends any run immediately (respawn, death): back to Ranch, delayed callbacks invalidated,
+-- client told at once. Removes a leftover test mount from the given character if any.
+local function resetToRanch(player: Player, session: Session, character: Instance?)
+	removeMountFrom(character)
+	if session.State ~= "Ranch" or not RunSessionState.IsValid(session) then
+		RunSessionState.ToRanch(session)
+	end
+	notify(player, session)
+end
+
 local function onCharacterAdded(player: Player, character: Model)
 	local session = sessions[player]
 	if session == nil then
 		return
 	end
-	session.Biome = nil
-	session.Run = nil
-	-- Make sure every new character starts at the ranch hub (also covers the very first spawn).
+	-- Immediately: never leave the session Riding/Collapsed for a character that no longer exists.
+	resetToRanch(player, session, character)
+	local token = session.Token
+
+	local humanoid = character:FindFirstChildOfClass("Humanoid") or character:WaitForChild("Humanoid", 10)
+	if humanoid and humanoid:IsA("Humanoid") then
+		humanoid.Died:Connect(function()
+			if sessions[player] == session and player.Character == character and session.State ~= "Ranch" then
+				resetToRanch(player, session, character)
+			end
+		end)
+	end
+
+	-- Then: put the new character at the ranch hub once its root part exists (also covers the
+	-- very first spawn), unless something else has changed the session in the meantime.
 	task.defer(function()
 		local root = character:WaitForChild("HumanoidRootPart", 10)
-		if root and root:IsA("BasePart") and player.Character == character then
+		if
+			root
+			and root:IsA("BasePart")
+			and sessions[player] == session
+			and player.Character == character
+			and RunSessionState.IsCurrent(session, token)
+		then
 			teleport(root, WorldService.GetHubSpawn())
-		end
-		if sessions[player] == session and player.Character == character then
-			setState(player, session, "Ranch")
 		end
 	end)
 end
@@ -339,7 +363,7 @@ function RunSessionService.DebugSetSpeed(player: Player, speed: number?): (boole
 		run.Speed = speed or CourseConfig.BaselineRidingSpeed
 		-- The speed cap grows with time from now on; keep it consistent with distance so far.
 		run.Elapsed = math.max(run.Elapsed, run.Progress / run.Speed)
-		setState(player, session, "Riding") -- resend the riding payload with the new speed
+		notify(player, session) -- resend the riding payload with the new speed
 	end
 	return true
 end
@@ -376,7 +400,7 @@ end
 
 function RunSessionService:Start()
 	PlayerService.OnPlayerAdded(function(player: Player)
-		local session: Session = { State = "Ranch", StatsTimer = 0, Token = 0 }
+		local session = RunSessionState.new()
 		sessions[player] = session
 		player.CharacterAdded:Connect(function(character)
 			onCharacterAdded(player, character)
@@ -392,6 +416,13 @@ function RunSessionService:Start()
 	RunService.Heartbeat:Connect(function(dt: number)
 		for player, session in sessions do
 			if player.Parent ~= Players then
+				continue
+			end
+			-- Defensive: a session that breaks its invariant is recovered, never processed.
+			local valid, reason = RunSessionState.IsValid(session)
+			if not valid then
+				warn(`[RunSession] {player.Name} session invalid ({reason}); returning to ranch`)
+				resetToRanch(player, session, player.Character)
 				continue
 			end
 			if session.State == "StartingArea" then

@@ -404,3 +404,11 @@ that needs it fails with an `OPEN QUESTION` error. Remove a row once decided and
 - 2026-11-19 – Blender → Roblox scale convention verified: 1 Blender unit = 1 stud with FBX
   export Apply Scalings = FBX Unit Scale, Scale 1.0, Z Forward / Y Up, and Studio Scale Unit =
   Stud. A 10 × 10 × 10 test cube imported as Size 10, 10, 10 (designer convention).
+- 2026-11-19 – Phase 3 review fixes (ChatGPT on 9ae2c9d): run sessions now change state through
+  `Shared/Rules/RunSessionState` (state, biome and run change together; every change bumps the
+  Token), so a respawn or death returns to Ranch immediately and can never leave a session
+  Riding without a run; the Heartbeat recovers any invalid session. Mobile steering tracks each
+  touch separately (`Shared/Util/HoldTracker`) and releases on end/cancel anywhere, on sliding
+  off the button, on run end and on focus loss. 18 regression tests (76 total); Studio checks
+  for respawn mid-run, respawn during the collapse message, emulator and mouse steering passed.
+  Speed validation finding acknowledged; proposal pending designer decision (unchanged).
