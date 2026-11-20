@@ -76,6 +76,27 @@ from spawning → taming → inventory → ranch → mount:
 - The seed is logged with each run and kept in the run session, so any encounter can be
   replayed in Studio with a debug command.
 
+### Run validation: accepted progress vs physical position
+Two different "positions" exist during a ride; gameplay must use the right one.
+
+| | **Accepted progress** (`RunProgress.Progress`) | **Physical position** (the character's `HumanoidRootPart`) |
+|---|---|---|
+| Owned by | the server | the player's client (it simulates its own character) |
+| Can go backwards | never | yes |
+| Upper limit | `speed × (elapsed + LeadAllowanceSeconds)` — at most **8 studs** ahead of a perfect rider at 32 studs/s | not limited directly; the server only **moves the character back** once it is more than `PullBackStuds` (**20 studs**, unchanged since Phase 3, intentional) beyond accepted progress |
+| Used for | stamina, collapse, end of course, the stamina bar / distance sent to the client, logs, `runinfo` | only: detecting the starting-line crossing, the input to `RunProgress.Step`, and the pull-back / sideways-correction checks |
+
+- So a character can **physically** be up to about **28 studs** ahead of a perfect rider at
+  32 studs/s (8-stud lead allowance + 20-stud pull-back threshold) before it is moved back —
+  in general `speed × LeadAllowanceSeconds + PullBackStuds`. Legitimate riders never get there:
+  measured lead is 0.
+- That physical tolerance **cannot earn anything**: stamina, distance and run end are calculated
+  only from accepted progress (regression test in `Course.spec`). The 20-stud margin exists only
+  so honest players are not visibly rubber-banded by small corrections.
+- **Rule for later phases:** encounter targeting, lassoing and catching (Phases 4–6) must be
+  validated on the server against **accepted progress** (and the server's own animal positions),
+  never against the raw character position, which may be up to ~28 studs further ahead.
+
 ### Multiplayer course model (designer decision 2026-11-18)
 - **Course geometry is shared**: one course per biome in the world; all riders use it at once.
 - **Encounters are individual**: each player's run has its own seeded plan. Player A may see a
@@ -251,13 +272,19 @@ build phase – it belongs to Phase 13. Phase order is fixed.
       randomly selected encounter slots; left/right side and emergence position per animal
 - [ ] Animals hide in bushes, run out as the player approaches, then move with
       species-specific speed and behaviour; can pull ahead
+- [ ] Server decides when an animal emerges from the rider's **accepted progress**
+      (`RunProgress.Progress`), not the raw character position
 - [ ] Test: debug view of slots; same seed reproduces the same plan; unreachable segments empty
 - Not in this phase: emergence animation polish, final animal models
 
 ### Phase 5 – Targeting & lasso
 - [ ] Yellow/red ring selection and lock rules, dotted outline, stars shown, `???` names
 - [ ] Lasso trigger and biome lasso requirement
-- [ ] Test: lock/unlock behaves exactly as the design doc describes
+- [ ] Server validates every target, lasso and catch against the rider's **accepted progress**
+      and the server's own animal positions (the character may physically be up to ~28 studs
+      ahead); client requests alone never select or catch
+- [ ] Test: lock/unlock behaves exactly as the design doc describes; a client claiming a
+      catch from an invalid position is rejected
 
 ### Phase 6 – Taming QTE
 - [ ] Server-authoritative meter, random directional prompts, grace, drain, mistake rule
@@ -419,3 +446,9 @@ that needs it fails with an `OPEN QUESTION` error. Remove a row once decided and
   showed a largest lead of 0 over a perfect rider. Pull-back threshold (20 studs) unchanged; lead
   measurement and rejected-sample logging kept. Tests: legitimate and bursty riders pass;
   constant 10% / 25% hacks rejected within ~2.5 s / ~1 s; saved-up headroom cannot be used.
+- 2026-11-20 – Review clarification (ChatGPT on f397764 / 8c914a4): the 20-stud pull-back
+  threshold is intentional and unchanged. Documented the difference between accepted progress
+  (`RunProgress.Progress`, server-owned, drives stamina and run end) and the physical character
+  position (may be up to ~28 studs ahead at 32 studs/s before being moved back). Regression test
+  added showing the physical tolerance earns no extra progress or stamina. Phases 4–5 must
+  validate emergence, targeting, lasso and catching against accepted progress.

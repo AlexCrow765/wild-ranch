@@ -245,6 +245,57 @@ return function(t)
 		t.truthy(accepted <= 32 * run.Elapsed + allowanceStuds(32) + 1e-6, "capped at a legit rider + 8 studs")
 	end)
 
+	t.test("physical tolerance before pull-back is 8 + 20 = 28 studs at 32 studs/s", function()
+		local validation = CourseConfig.Validation
+		local physicalTolerance = 32 * validation.LeadAllowanceSeconds + validation.PullBackStuds
+		t.eq(physicalTolerance, 28)
+	end)
+
+	t.test("being physically ahead (within the pull-back tolerance) earns no extra progress or stamina", function()
+		local dt = 1 / 60
+		local honest = newTestRun()
+		local ahead = newTestRun()
+		local physicalLead = 27 -- just inside the 28-stud tolerance, so never moved back
+		local honestCollapse: number? = nil
+		local aheadCollapse: number? = nil
+		local time = 0
+		for _ = 1, 60 * 40 do
+			time += dt
+			local perfect = honest.Speed * time
+			-- Like RunSessionService, a run stops being stepped once it has collapsed.
+			if honestCollapse == nil then
+				RunProgress.Step(honest, perfect, dt)
+			end
+			if aheadCollapse == nil then
+				RunProgress.Step(ahead, perfect + physicalLead, dt)
+			end
+
+			-- Accepted progress never exceeds a perfect rider + the 8-stud allowance...
+			t.truthy(ahead.Progress <= perfect + allowanceStuds(32) + 1e-6, `progress capped at t={time}`)
+			-- ...and stamina comes only from accepted progress, never the physical position.
+			t.near(ahead.Stamina, math.max(0, ahead.MaxStamina - ahead.Progress * ahead.StaminaPerStud), 1e-9, "stamina from Progress")
+			-- So the gain over an honest rider is at most the allowance's worth of stamina.
+			t.truthy(honest.Stamina - ahead.Stamina <= allowanceStuds(32) * ahead.StaminaPerStud + 1e-6, "no extra stamina effect")
+
+			if honestCollapse == nil and RunProgress.IsExhausted(honest) then
+				honestCollapse = time
+			end
+			if aheadCollapse == nil and RunProgress.IsExhausted(ahead) then
+				aheadCollapse = time
+			end
+			if honestCollapse and aheadCollapse then
+				break
+			end
+		end
+		t.truthy(honestCollapse ~= nil and aheadCollapse ~= nil, "both runs ended")
+		-- Run end comes from accepted progress: at most the allowance (0.25 s) earlier, never 27 studs' worth.
+		t.truthy(
+			(honestCollapse :: number) - (aheadCollapse :: number) <= CourseConfig.Validation.LeadAllowanceSeconds + dt,
+			`collapse only up to 0.25 s earlier (honest {honestCollapse}, ahead {aheadCollapse})`
+		)
+		t.truthy(ahead.Progress <= RunProgress.ReachDistance(ahead) + allowanceStuds(32) + 1e-6, "no progress beyond the reach")
+	end)
+
 	t.test("lead measurement: a perfect rider has ~0 lead", function()
 		local run = newTestRun()
 		rideTo(run, 500, 1 / 60)
