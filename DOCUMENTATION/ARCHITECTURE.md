@@ -412,3 +412,10 @@ that needs it fails with an `OPEN QUESTION` error. Remove a row once decided and
   off the button, on run end and on focus loss. 18 regression tests (76 total); Studio checks
   for respawn mid-run, respawn during the collapse message, emulator and mouse steering passed.
   Speed validation finding acknowledged; proposal pending designer decision (unchanged).
+- 2026-11-20 – Speed validation (review finding 3, designer approved): the accepted forward limit
+  is now `speed × (elapsed + LeadAllowanceSeconds)` with `LeadAllowanceSeconds = 0.25`, replacing
+  the earlier `speed × elapsed × 1.25 + 6 studs` (which let a constant 25% speed hack through and
+  let riders save up headroom). Chosen after Studio measurement: 4 runs at 32 and 120 studs/s
+  showed a largest lead of 0 over a perfect rider. Pull-back threshold (20 studs) unchanged; lead
+  measurement and rejected-sample logging kept. Tests: legitimate and bursty riders pass;
+  constant 10% / 25% hacks rejected within ~2.5 s / ~1 s; saved-up headroom cannot be used.

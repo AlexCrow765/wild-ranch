@@ -138,6 +138,151 @@ return function(t)
 		t.truthy(run.Stamina > 0, "stamina reflects only the accepted distance")
 	end)
 
+	-- ===== Speed validation: speed x (elapsed + LeadAllowanceSeconds) (designer approved) =====
+
+	-- Rides for `seconds` at `factor` x the mount speed, sampling at 60 Hz.
+	-- Returns the run and the time of the first rejected sample (or nil).
+	local function rideAtFactor(speed: number, factor: number, seconds: number): (RunProgress.Run, number?)
+		local run = RunProgress.new(MountConfig.TestMountStamina, MountConfig.StaminaPerStud, speed)
+		local dt = 1 / 60
+		local firstRejection: number? = nil
+		local position = 0
+		local time = 0
+		while time < seconds - 1e-9 do
+			time += dt
+			position += speed * factor * dt
+			local _, rejected = RunProgress.Step(run, position, dt)
+			if rejected and firstRejection == nil then
+				firstRejection = time
+			end
+		end
+		return run, firstRejection
+	end
+
+	local function allowanceStuds(speed: number): number
+		return speed * CourseConfig.Validation.LeadAllowanceSeconds
+	end
+
+	t.test("validation config: 0.25 s lead allowance, old multiplier and slack removed, pull-back unchanged", function()
+		local validation = CourseConfig.Validation :: any
+		t.eq(validation.LeadAllowanceSeconds, 0.25)
+		t.eq(validation.SpeedTolerance, nil, "SpeedTolerance removed")
+		t.eq(validation.SlackStuds, nil, "SlackStuds removed")
+		t.eq(validation.PullBackStuds, 20, "pull-back threshold unchanged")
+	end)
+
+	t.test("accepted limit = speed x (elapsed + 0.25 s)", function()
+		local run = newTestRun()
+		t.near(RunProgress.MaxAccepted(run, 0), 32 * 0.25, 1e-9, "8 studs at the start")
+		rideTo(run, 320, 1 / 60) -- 10 s of perfect riding
+		t.near(RunProgress.MaxAccepted(run, 0), 32 * (run.Elapsed + 0.25), 1e-9)
+	end)
+
+	t.test("legitimate riders pass at the normal and the boosted test speed", function()
+		for _, speed in { CourseConfig.BaselineRidingSpeed, 120 } do
+			local run, firstRejection = rideAtFactor(speed, 1, 864 / speed)
+			t.eq(firstRejection, nil, `no rejection at {speed} studs/s`)
+			t.eq(run.Violations, 0)
+			t.truthy(run.Progress >= 863, `reached ~864 studs at {speed} studs/s (got {run.Progress})`)
+		end
+	end)
+
+	t.test("bursty network movement passes: a 2 s freeze then catching up to the true position", function()
+		local run = newTestRun()
+		rideTo(run, 200, 1 / 60)
+		local truePosition = run.Progress
+		for _ = 1, 120 do -- no position updates for 2 s while the rider keeps going
+			truePosition += run.Speed / 60
+			RunProgress.Step(run, run.Progress, 1 / 60)
+		end
+		local _, rejected = RunProgress.Step(run, truePosition, 1 / 60)
+		t.eq(rejected, false, "64-stud catch-up after a 2 s gap is legal")
+		t.eq(run.Violations, 0)
+	end)
+
+	t.test("bursty network movement passes: positions arriving 0-300 ms late in random bursts", function()
+		local run = newTestRun()
+		local rng = Random.new(2026)
+		local dt = 1 / 60
+		local time = 0
+		local reported = 0
+		for _ = 1, 60 * 20 do -- 20 s
+			time += dt
+			if rng:NextNumber() < 0.3 then -- an update arrives on ~30% of frames
+				local delay = rng:NextNumber() * 0.3
+				reported = math.max(reported, run.Speed * math.max(0, time - delay))
+			end
+			RunProgress.Step(run, reported, dt)
+		end
+		t.eq(run.Violations, 0, "late, bursty positions never exceed the limit")
+	end)
+
+	t.test("a constant 25% speed exploit is rejected within ~1 s and held to the allowance", function()
+		local run, firstRejection = rideAtFactor(32, 1.25, 10)
+		t.truthy(firstRejection ~= nil and (firstRejection :: number) <= 1.05, `first rejection at {tostring(firstRejection)} s`)
+		t.truthy(run.Violations > 0)
+		t.truthy(run.Progress <= 32 * run.Elapsed + allowanceStuds(32) + 1e-6, "accepted never beyond a legit rider + 8 studs")
+	end)
+
+	t.test("a constant 10% speed exploit is rejected within ~2.5 s and held to the allowance", function()
+		local run, firstRejection = rideAtFactor(32, 1.10, 10)
+		t.truthy(firstRejection ~= nil and (firstRejection :: number) <= 2.55, `first rejection at {tostring(firstRejection)} s`)
+		t.truthy(run.Violations > 0)
+		t.truthy(run.Progress <= 32 * run.Elapsed + allowanceStuds(32) + 1e-6, "accepted never beyond a legit rider + 8 studs")
+	end)
+
+	t.test("saving up headroom (riding slow) then jumping forward cannot bypass validation", function()
+		local run = newTestRun()
+		local dt = 1 / 60
+		local position = 0
+		for _ = 1, 60 * 30 do -- 30 s at half speed: 480 studs "saved up" versus a legit rider
+			position += 16 * dt
+			RunProgress.Step(run, position, dt)
+		end
+		local legitPosition = 32 * run.Elapsed
+		local accepted, rejected = RunProgress.Step(run, legitPosition + 400, dt) -- teleport attempt
+		t.truthy(rejected, "the jump is rejected")
+		t.truthy(accepted <= 32 * run.Elapsed + allowanceStuds(32) + 1e-6, "capped at a legit rider + 8 studs")
+	end)
+
+	t.test("lead measurement: a perfect rider has ~0 lead", function()
+		local run = newTestRun()
+		rideTo(run, 500, 1 / 60)
+		t.near(run.MaxLeadStuds, 0, 1e-6, "studs")
+		t.near(run.MaxLeadSeconds, 0, 1e-6, "seconds")
+		t.eq(run.DebugMoved, false)
+	end)
+
+	t.test("lead measurement records the largest lead ahead of speed x time, in studs and seconds", function()
+		local run = newTestRun()
+		rideTo(run, 100, 1 / 60)
+		local expected = run.Speed * (run.Elapsed + 0.1)
+		RunProgress.Step(run, expected + 4, 0.1) -- 4 studs ahead of a perfect rider
+		t.near(run.MaxLeadStuds, 4, 1e-6, "studs")
+		t.near(run.MaxLeadSeconds, 4 / run.Speed, 1e-9, "seconds = studs / speed")
+		RunProgress.Step(run, run.Speed * (run.Elapsed + 0.1) + 1, 0.1) -- smaller lead later
+		t.near(run.MaxLeadStuds, 4, 1e-6, "keeps the maximum")
+	end)
+
+	t.test("lead measurement does not change what the server accepts", function()
+		local measured = newTestRun()
+		local reference = newTestRun()
+		for i = 1, 300 do
+			local observed = i * 0.6 -- slightly faster than 32 studs/s at 60 Hz
+			RunProgress.Step(measured, observed, 1 / 60)
+			RunProgress.Step(reference, observed, 1 / 60)
+		end
+		t.eq(measured.Progress, reference.Progress)
+		t.eq(measured.Violations, reference.Violations)
+		t.truthy(measured.MaxLeadStuds > 0, "the faster-than-allowed-speed lead is recorded")
+	end)
+
+	t.test("debug teleports mark the run so its lead data is excluded", function()
+		local run = newTestRun()
+		RunProgress.SetProgress(run, 400)
+		t.truthy(run.DebugMoved)
+	end)
+
 	t.test("debug SetProgress moves directly and recalculates stamina", function()
 		local run = newTestRun()
 		RunProgress.SetProgress(run, 864)

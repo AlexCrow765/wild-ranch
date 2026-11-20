@@ -56,6 +56,22 @@ local RunSessionService = {
 }
 
 local sessions: { [Player]: Session } = {}
+
+-- Measurement only (review finding 3): largest lead over a perfect rider across all runs on
+-- this server that were not moved by debug commands. Read with the "runinfo" debug command.
+local leadStats = { Runs = 0, MaxStuds = 0, MaxSeconds = 0, MaxSpeed = 0 }
+
+local function recordLead(run: RunProgress.Run)
+	if run.DebugMoved then
+		return
+	end
+	leadStats.Runs += 1
+	if run.MaxLeadSeconds > leadStats.MaxSeconds then
+		leadStats.MaxSeconds = run.MaxLeadSeconds
+		leadStats.MaxStuds = run.MaxLeadStuds
+		leadStats.MaxSpeed = run.Speed
+	end
+end
 local runStateRemote: RemoteEvent
 local runStatsRemote: UnreliableRemoteEvent
 
@@ -175,8 +191,9 @@ local function collapse(player: Player, session: Session, reason: string)
 		Seconds = CourseConfig.CollapseMessageSeconds,
 		Distance = run.Progress,
 	})
+	recordLead(run)
 	print(
-		`[RunSession] {player.Name} run ended ({reason}) at {string.format("%.1f", run.Progress)} studs, segment {CourseLayout.SegmentAt(run.Progress)}, rejected samples: {run.Violations}`
+		`[RunSession] {player.Name} run ended ({reason}) at {string.format("%.1f", run.Progress)} studs, segment {CourseLayout.SegmentAt(run.Progress)}, rejected samples: {run.Violations}, max lead {string.format("%.2f studs (%.3f s at %g studs/s)", run.MaxLeadStuds, run.MaxLeadSeconds, run.Speed)}{if run.DebugMoved then " [debug-moved, not counted]" else ""}`
 	)
 
 	local token = session.Token
@@ -274,6 +291,9 @@ end
 -- client told at once. Removes a leftover test mount from the given character if any.
 local function resetToRanch(player: Player, session: Session, character: Instance?)
 	removeMountFrom(character)
+	if session.State == "Riding" and session.Run then
+		recordLead(session.Run) -- a run cut short still counts as measurement data
+	end
 	if session.State ~= "Ranch" or not RunSessionState.IsValid(session) then
 		RunSessionState.ToRanch(session)
 	end
@@ -333,17 +353,46 @@ function RunSessionService.DebugInfo(): string
 		local run = session.Run
 		if run then
 			line ..= string.format(
-				", progress %.1f studs (segment %d), stamina %.2f / %d, rejected samples %d",
+				", progress %.1f studs (segment %d), stamina %.2f / %d, rejected samples %d, max lead %.2f studs (%.3f s)%s",
 				run.Progress,
 				CourseLayout.SegmentAt(run.Progress),
 				run.Stamina,
 				run.MaxStamina,
-				run.Violations
+				run.Violations,
+				run.MaxLeadStuds,
+				run.MaxLeadSeconds,
+				if run.DebugMoved then " [debug-moved]" else ""
 			)
 		end
 		table.insert(lines, line)
 	end
-	return if #lines > 0 then table.concat(lines, "\n") else "no players"
+	if #lines == 0 then
+		table.insert(lines, "no players")
+	end
+	local allowance = CourseConfig.Validation.LeadAllowanceSeconds
+	if leadStats.MaxSeconds > 0 then
+		table.insert(
+			lines,
+			string.format(
+				"Largest lead this server (%d measured runs): %.2f studs = %.3f s of travel (at %g studs/s); allowance %.2f s",
+				leadStats.Runs,
+				leadStats.MaxStuds,
+				leadStats.MaxSeconds,
+				leadStats.MaxSpeed,
+				allowance
+			)
+		)
+	else
+		table.insert(
+			lines,
+			string.format(
+				"Largest lead this server (%d measured runs): none - riders never got ahead of speed x time; allowance %.2f s",
+				leadStats.Runs,
+				allowance
+			)
+		)
+	end
+	return table.concat(lines, "\n")
 end
 
 -- Studio debug: override a player's riding speed (nil = back to the approved baseline).
@@ -361,6 +410,7 @@ function RunSessionService.DebugSetSpeed(player: Player, speed: number?): (boole
 	local run = session.Run
 	if session.State == "Riding" and run then
 		run.Speed = speed or CourseConfig.BaselineRidingSpeed
+		run.DebugMoved = true -- lead data from a mid-run speed change is not representative
 		-- The speed cap grows with time from now on; keep it consistent with distance so far.
 		run.Elapsed = math.max(run.Elapsed, run.Progress / run.Speed)
 		notify(player, session) -- resend the riding payload with the new speed

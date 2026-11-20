@@ -57,9 +57,11 @@ CourseConfig.GreyBox = table.freeze({
 })
 
 -- Server-side movement validation (implementation tolerances, not gameplay)
+-- Accepted forward distance <= speed x (elapsed + LeadAllowanceSeconds). Designer approved
+-- 2026-11-20 after Studio measurement showed a legitimate rider's lead over speed x elapsed
+-- is 0 (positions reach the server late, never early).
 CourseConfig.Validation = table.freeze({
-	SpeedTolerance = 1.25, -- accept up to 125% of the distance the mount could cover since run start
-	SlackStuds = 6, -- plus this many studs (crossing the line, rounding)
+	LeadAllowanceSeconds = 0.25, -- of travel at the mount's speed (8 studs at 32 studs/s)
 	PullBackStuds = 20, -- if a rider is this far beyond the accepted position, move them back
 	LateralToleranceStuds = 4, -- allowed beyond the playable half-width before correction
 })
