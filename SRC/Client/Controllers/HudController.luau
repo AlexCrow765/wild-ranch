@@ -1,9 +1,11 @@
 --!strict
 --[[
 	HudController
-	Grey-box Phase 3 HUD (plain UI; final styling is Phase 13):
-	  - stamina bar
-	  - debug readout: state, distance, segment, forward speed
+	Grey-box riding HUD (plain UI; final styling is Phase 13):
+	  - mount name above the stamina bar ("Test Mount" until Phase 8 mount selection)
+	  - stamina bar with current / max stamina; colour shifts as stamina runs low
+	  - run-state line: starting-area prompt, "Riding" + segment
+	  - debug readout (Studio only): state, distance, segment, forward speed
 	  - temporary "Ride Plains" button at the ranch (until the Phase 9 level-select screen)
 	  - "Return to Ranch" button, shown only in a starting area (design notes 2.B)
 	  - centre message (e.g. "Out of stamina")
@@ -28,9 +30,22 @@ local HudController = {
 }
 
 local player = Players.LocalPlayer
+local IS_STUDIO = RunService:IsStudio()
+
+-- Visual-only HUD constants (not gameplay values).
+local STAMINA_COLOR_OK = Color3.fromRGB(90, 200, 90)
+local STAMINA_COLOR_LOW = Color3.fromRGB(240, 170, 40) -- at or below 30%
+local STAMINA_COLOR_CRITICAL = Color3.fromRGB(225, 60, 50) -- at or below 10%
+local STEER_COLOR_IDLE = Color3.fromRGB(40, 40, 40)
+local STEER_COLOR_HELD = Color3.fromRGB(90, 170, 90)
+local STATUS_STARTING_AREA = "Cross the starting line to ride"
+
+local lastMountName = ""
 
 type Ui = {
 	Gui: ScreenGui,
+	MountName: TextLabel,
+	Status: TextLabel,
 	StaminaFrame: Frame,
 	StaminaFill: Frame,
 	StaminaText: TextLabel,
@@ -86,8 +101,14 @@ local steerHolds = HoldTracker.new()
 local steerButtons: { [string]: TextButton } = {}
 
 local function syncSteer()
-	InputController.SetTouchSteer("Left", HoldTracker.IsHeld(steerHolds, "Left"))
-	InputController.SetTouchSteer("Right", HoldTracker.IsHeld(steerHolds, "Right"))
+	for _, side in { "Left", "Right" } do
+		local held = HoldTracker.IsHeld(steerHolds, side)
+		InputController.SetTouchSteer(side :: any, held)
+		local item = steerButtons[side]
+		if item then
+			item.BackgroundColor3 = if held then STEER_COLOR_HELD else STEER_COLOR_IDLE
+		end
+	end
 end
 
 local function releaseInput(input: InputObject)
@@ -99,6 +120,7 @@ end
 local function clearSteer()
 	HoldTracker.Clear(steerHolds)
 	InputController.ClearTouchSteer()
+	syncSteer() -- also resets the pressed look of both buttons
 end
 
 local function isHoldInput(input: InputObject): boolean
@@ -106,9 +128,16 @@ local function isHoldInput(input: InputObject): boolean
 end
 
 local function steerButton(parent: Instance, side: "Left" | "Right", position: UDim2): TextButton
-	local item = button(parent, `Steer{side}`, UDim2.fromOffset(150, 150), position, if side == "Left" then "◀" else "▶")
+	local item = button(parent, `Steer{side}`, UDim2.fromOffset(170, 170), position, if side == "Left" then "◀" else "▶")
 	item.AnchorPoint = Vector2.new(if side == "Left" then 0 else 1, 1)
-	item.AutoButtonColor = true
+	item.AutoButtonColor = false -- the held look is driven by the hold tracker (syncSteer)
+	item.BackgroundColor3 = STEER_COLOR_IDLE
+	local stroke = Instance.new("UIStroke")
+	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	stroke.Color = Color3.new(1, 1, 1)
+	stroke.Thickness = 3
+	stroke.Transparency = 0.3
+	stroke.Parent = item
 	steerButtons[side] = item
 
 	item.InputBegan:Connect(function(input: InputObject)
@@ -176,10 +205,14 @@ local function build(): Ui
 	gui.IgnoreGuiInset = false
 	gui.Parent = player:WaitForChild("PlayerGui")
 
+	local mountName = label(gui, "MountName", UDim2.fromOffset(320, 24), UDim2.new(0.5, 0, 0, 8), "")
+	mountName.AnchorPoint = Vector2.new(0.5, 0)
+	mountName.Visible = false
+
 	local staminaFrame = Instance.new("Frame")
 	staminaFrame.Name = "Stamina"
 	staminaFrame.AnchorPoint = Vector2.new(0.5, 0)
-	staminaFrame.Position = UDim2.new(0.5, 0, 0, 12)
+	staminaFrame.Position = UDim2.new(0.5, 0, 0, 36)
 	staminaFrame.Size = UDim2.fromOffset(320, 28)
 	staminaFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 	staminaFrame.BackgroundTransparency = 0.2
@@ -195,11 +228,16 @@ local function build(): Ui
 
 	local staminaText = label(staminaFrame, "Text", UDim2.fromScale(1, 1), UDim2.fromScale(0, 0), "")
 
+	local status = label(gui, "Status", UDim2.fromOffset(460, 26), UDim2.new(0.5, 0, 0, 72), "")
+	status.AnchorPoint = Vector2.new(0.5, 0)
+	status.Visible = false
+
 	local debugLabel = label(gui, "Debug", UDim2.fromOffset(360, 90), UDim2.fromOffset(12, 12), "")
 	debugLabel.TextXAlignment = Enum.TextXAlignment.Left
 	debugLabel.TextYAlignment = Enum.TextYAlignment.Top
 	debugLabel.TextScaled = false
 	debugLabel.TextSize = 16
+	debugLabel.Visible = IS_STUDIO -- developer readout only
 
 	local message = label(gui, "Message", UDim2.fromOffset(600, 80), UDim2.fromScale(0.5, 0.4), "")
 	message.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -217,6 +255,8 @@ local function build(): Ui
 
 	return {
 		Gui = gui,
+		MountName = mountName,
+		Status = status,
 		StaminaFrame = staminaFrame,
 		StaminaFill = fill,
 		StaminaText = staminaText,
@@ -236,14 +276,39 @@ local function updateStamina()
 		return
 	end
 	local stamina = math.max(0, RideController.Stats.Stamina or maxStamina)
-	ui.StaminaFill.Size = UDim2.fromScale(math.clamp(stamina / maxStamina, 0, 1), 1)
-	ui.StaminaText.Text = string.format("Stamina %.1f / %d", stamina, maxStamina)
+	local fraction = math.clamp(stamina / maxStamina, 0, 1)
+	ui.StaminaFill.Size = UDim2.fromScale(fraction, 1)
+	ui.StaminaFill.BackgroundColor3 = if fraction <= 0.1
+		then STAMINA_COLOR_CRITICAL
+		elseif fraction <= 0.3 then STAMINA_COLOR_LOW
+		else STAMINA_COLOR_OK
+	ui.StaminaText.Text = string.format("Stamina %.0f / %d", math.ceil(stamina), maxStamina)
+end
+
+local function updateStatus()
+	local state = RideController.State
+	if state == "StartingArea" then
+		ui.Status.Text = STATUS_STARTING_AREA
+		ui.Status.Visible = true
+	elseif state == "Riding" then
+		local segment = CourseLayout.SegmentAt(RideController.Stats.Progress or 0)
+		ui.Status.Text = `Riding · Segment {math.max(segment, 1)} / {CourseConfig.SegmentsPerBiome}`
+		ui.Status.Visible = true
+	else
+		ui.Status.Visible = false -- Ranch: Ride Plains button; Collapsed: centre message
+	end
 end
 
 local function onState(payload: { [string]: any })
 	local state = payload.State
 	local riding = state == "Riding"
 	local collapsed = state == "Collapsed"
+
+	if riding and typeof(payload.MountName) == "string" then
+		lastMountName = payload.MountName
+	end
+	ui.MountName.Text = lastMountName
+	ui.MountName.Visible = (riding or collapsed) and lastMountName ~= ""
 
 	ui.RideButton.Visible = state == "Ranch"
 	ui.ReturnButton.Visible = state == "StartingArea"
@@ -265,6 +330,7 @@ local function onState(payload: { [string]: any })
 	else
 		ui.Message.Visible = false
 	end
+	updateStatus()
 end
 
 local function updateDebug()
@@ -291,9 +357,14 @@ function HudController:Start()
 	ui = build()
 	connectSteerSafetyNets()
 	RideController.StateChanged:Connect(onState)
-	RideController.StatsChanged:Connect(updateStamina)
+	RideController.StatsChanged:Connect(function()
+		updateStamina()
+		updateStatus()
+	end)
 	onState(RideController.Payload.State and RideController.Payload or { State = RideController.State })
-	RunService.RenderStepped:Connect(updateDebug)
+	if IS_STUDIO then
+		RunService.RenderStepped:Connect(updateDebug)
+	end
 end
 
 return HudController

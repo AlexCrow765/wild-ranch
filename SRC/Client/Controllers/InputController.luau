@@ -4,11 +4,13 @@
 	Tracks which kind of device the player is currently using so UI can show the
 	right prompts (keys on PC, on-screen arrows on mobile, D-pad on console).
 
-	Steering (Phase 3, designer approved): GetSteer() returns -1 (left) .. +1 (right) from
+	Steering (designer approved): GetSteer() returns -1 (left) .. +1 (right) from
 	  PC:      A/D and Left/Right arrows
 	  Gamepad: left stick X and D-pad left/right
 	  Mobile:  two on-screen buttons (HudController calls SetTouchSteer)
-	All sources are combined, so mixing devices never gets stuck.
+	The rules for combining sources live in Shared/Rules/SteerInput (tested): the same direction
+	counts once, opposite directions cancel to 0, and steering is 0 whenever not riding
+	(RideController calls SetRidingActive).
 
 	Phase 6 adds the QTE directions here.
 ]]
@@ -19,6 +21,7 @@ local UserInputService = game:GetService("UserInputService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Signal = require(Shared:WaitForChild("Util"):WaitForChild("Signal"))
 local CourseConfig = require(Shared:WaitForChild("Config"):WaitForChild("CourseConfig"))
+local SteerInput = require(Shared:WaitForChild("Rules"):WaitForChild("SteerInput"))
 
 local LEFT_KEYS = { Enum.KeyCode.A, Enum.KeyCode.Left }
 local RIGHT_KEYS = { Enum.KeyCode.D, Enum.KeyCode.Right }
@@ -26,6 +29,7 @@ local RIGHT_KEYS = { Enum.KeyCode.D, Enum.KeyCode.Right }
 local thumbstickX = 0
 local touchLeft = false
 local touchRight = false
+local ridingActive = false
 
 export type Scheme = "KeyboardMouse" | "Gamepad" | "Touch"
 
@@ -71,36 +75,32 @@ end
 
 -- Steering input: -1 = full left, +1 = full right, 0 = none.
 function InputController.GetSteer(): number
-	local steer = 0
-
 	-- Keyboard is ignored while the player is typing (e.g. in chat).
-	if UserInputService:GetFocusedTextBox() == nil then
-		if anyKeyDown(LEFT_KEYS) then
-			steer -= 1
-		end
-		if anyKeyDown(RIGHT_KEYS) then
-			steer += 1
-		end
-	end
+	local typing = UserInputService:GetFocusedTextBox() ~= nil
+	return SteerInput.Resolve({
+		Riding = ridingActive,
+		KeyboardLeft = not typing and anyKeyDown(LEFT_KEYS),
+		KeyboardRight = not typing and anyKeyDown(RIGHT_KEYS),
+		DPadLeft = UserInputService:IsGamepadButtonDown(Enum.UserInputType.Gamepad1, Enum.KeyCode.DPadLeft),
+		DPadRight = UserInputService:IsGamepadButtonDown(Enum.UserInputType.Gamepad1, Enum.KeyCode.DPadRight),
+		StickX = thumbstickX,
+		TouchLeft = touchLeft,
+		TouchRight = touchRight,
+	}, CourseConfig.SteerStickDeadzone)
+end
 
-	if UserInputService:IsGamepadButtonDown(Enum.UserInputType.Gamepad1, Enum.KeyCode.DPadLeft) then
-		steer -= 1
+-- RideController turns steering on for the duration of a ride; turning it off also drops any
+-- held on-screen buttons so nothing can carry into the next run.
+function InputController.SetRidingActive(active: boolean)
+	ridingActive = active
+	if not active then
+		touchLeft = false
+		touchRight = false
 	end
-	if UserInputService:IsGamepadButtonDown(Enum.UserInputType.Gamepad1, Enum.KeyCode.DPadRight) then
-		steer += 1
-	end
-	if math.abs(thumbstickX) > CourseConfig.SteerStickDeadzone then
-		steer += thumbstickX
-	end
+end
 
-	if touchLeft then
-		steer -= 1
-	end
-	if touchRight then
-		steer += 1
-	end
-
-	return math.clamp(steer, -1, 1)
+function InputController.IsRidingActive(): boolean
+	return ridingActive
 end
 
 -- Called by the on-screen steering buttons.

@@ -28,6 +28,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local ServerStorage = game:GetService("ServerStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = Shared:WaitForChild("Config")
@@ -38,6 +39,7 @@ local BiomeConfig = require(Config:WaitForChild("BiomeConfig"))
 local CourseLayout = require(Rules:WaitForChild("CourseLayout"))
 local RunProgress = require(Rules:WaitForChild("RunProgress"))
 local RunSessionState = require(Rules:WaitForChild("RunSessionState"))
+local MountSeat = require(Rules:WaitForChild("MountSeat"))
 local Remotes = require(Shared:WaitForChild("Net"):WaitForChild("Remotes"))
 
 local PlayerService = require(script.Parent:WaitForChild("PlayerService"))
@@ -49,7 +51,7 @@ type Session = RunSessionState.Session
 local DEBUG_MAX_SPEED = 500 -- studs/s; sanity limit for the debug override
 
 local STATS_INTERVAL = 0.1
-local MOUNT_NAME = "TestMount"
+local MOUNT_NAME = MountConfig.MountInstanceName
 
 local RunSessionService = {
 	LoadOrder = 30,
@@ -96,6 +98,7 @@ local function statePayload(session: Session): { [string]: any }
 		payload.Speed = run.Speed
 		payload.SteerSpeed = CourseConfig.SteerSpeed
 		payload.MaxStamina = run.MaxStamina
+		payload.MountName = MountConfig.TestMountName -- Phase 8: the selected mount's name
 		payload.ReachDistance = RunProgress.ReachDistance(run)
 	end
 	return payload
@@ -123,23 +126,104 @@ local function removeMount(player: Player)
 	removeMountFrom(player.Character)
 end
 
--- Grey-box test mount: a plain block welded under the rider. No collision, no mass.
+-- Grey-box test mount block (visual only), used when the horse model isn't in ServerStorage.
+local TEST_MOUNT_SIZE = Vector3.new(4, 3, 7)
+local warnedMissingModel = false
+local warnedBadSeat = false
+
+-- Makes every part of a cloned mount purely visual and welds it to the rider's root.
+local function weldVisual(mount: Instance, root: BasePart)
+	local parts = if mount:IsA("BasePart") then { mount } else {}
+	for _, descendant in mount:GetDescendants() do
+		if descendant:IsA("BasePart") then
+			table.insert(parts, descendant)
+		end
+	end
+	for _, part in parts do
+		part.Anchored = false
+		part.CanCollide = false
+		part.CanQuery = false
+		part.CanTouch = false
+		part.Massless = true
+		local weld = Instance.new("WeldConstraint")
+		weld.Part0 = root
+		weld.Part1 = part
+		weld.Parent = part
+	end
+end
+
+-- The horse model (ServerStorage.<TestMountFolder>.<TestMountModel>) with its Seat attachment,
+-- or nil if either is missing.
+local function findHorseTemplate(): (Model?, Attachment?)
+	local folder = ServerStorage:FindFirstChild(MountConfig.TestMountFolder)
+	local model = folder and folder:FindFirstChild(MountConfig.TestMountModel)
+	if model == nil or not model:IsA("Model") then
+		return nil, nil
+	end
+	local seat = model:FindFirstChild(MountConfig.SeatAttachment, true)
+	if seat == nil or not seat:IsA("Attachment") then
+		return nil, nil
+	end
+	-- An attachment's Position is relative to its part, so a correct Seat sits on or near it.
+	-- A far-away Seat (e.g. world coordinates typed into Position) would drag the horse away.
+	local seatPart = seat.Parent
+	if not seatPart or not seatPart:IsA("BasePart") or seat.Position.Magnitude > seatPart.Size.Magnitude then
+		if not warnedBadSeat then
+			warnedBadSeat = true
+			warn(
+				`[RunSession] {seat:GetFullName()} is {string.format("%.1f", seat.Position.Magnitude)} studs from its part (Position {seat.Position}); it should be on the saddle, e.g. Position 0, 0.175, 0. Using the grey-box block.`
+			)
+		end
+		return nil, nil
+	end
+	return model, seat
+end
+
+-- Test mount, welded to the rider. Neither version has collision or mass, so neither ever affects
+-- movement, stamina or validation.
+--  * Horse model: placed so its Seat attachment sits MountConfig.TestMountSeatDrop below the rider's
+--    root, facing the riding direction. The attribute "RiderHipHeight" tells the rider's client how
+--    high to lift the character so the hooves reach the ground (MountSeat.RiderHipHeight).
+--  * Fallback block: top at the same seat drop; no lift.
+-- The server cannot see the rider's animated pose (animations play on the clients), so the seat
+-- drop is a tuned value, not a measurement.
 local function attachMount(player: Player, root: BasePart)
 	removeMount(player)
+	local template, templateSeat = findHorseTemplate()
+	if template and templateSeat then
+		local horse = template:Clone()
+		horse.Name = MOUNT_NAME
+		local seat = horse:FindFirstChild(templateSeat.Name, true) :: Attachment
+		-- Seat height above the model's bottom (hooves), measured before moving it.
+		local boxCFrame, boxSize = horse:GetBoundingBox()
+		local seatHeight = (seat.WorldPosition - boxCFrame.Position):Dot(boxCFrame.UpVector) + boxSize.Y / 2
+		local target = MountSeat.SeatTarget(root.CFrame, MountConfig.TestMountSeatDrop)
+		horse:PivotTo(MountSeat.AlignedPivot(horse:GetPivot(), seat.WorldCFrame, target))
+		weldVisual(horse, root)
+		horse:SetAttribute(
+			"RiderHipHeight",
+			MountSeat.RiderHipHeight(seatHeight, MountConfig.TestMountSeatDrop, root.Size.Y / 2)
+		)
+		horse.Parent = player.Character
+		return
+	end
+	if not warnedMissingModel then
+		warnedMissingModel = true
+		warn(
+			`[RunSession] ServerStorage.{MountConfig.TestMountFolder}.{MountConfig.TestMountModel} (with a "{MountConfig.SeatAttachment}" attachment) not found; using the grey-box block`
+		)
+	end
 	local mount = Instance.new("Part")
 	mount.Name = MOUNT_NAME
-	mount.Size = Vector3.new(4, 3, 7)
+	mount.Size = TEST_MOUNT_SIZE
 	mount.Color = Color3.fromRGB(140, 100, 60)
 	mount.Material = Enum.Material.SmoothPlastic
 	mount.CanCollide = false
 	mount.CanQuery = false
 	mount.CanTouch = false
 	mount.Massless = true
-	mount.CFrame = root.CFrame * CFrame.new(0, -2.5, 0)
-	local weld = Instance.new("WeldConstraint")
-	weld.Part0 = root
-	weld.Part1 = mount
-	weld.Parent = mount
+	mount.CFrame = root.CFrame * CFrame.new(0, -MountConfig.TestMountSeatDrop - TEST_MOUNT_SIZE.Y / 2, 0)
+	weldVisual(mount, root)
 	mount.Parent = player.Character
 end
 

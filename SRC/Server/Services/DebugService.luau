@@ -40,7 +40,8 @@ WildRanchDebug commands:
   gems <player> <amount>        (negative to spend)
   runinfo                                        every player's run state, progress and stamina
   goto <player> <distance>      move a riding player to a forward distance (studs)
-  speed <player> <studsPerSec|reset>   test-only riding speed (now and for later rides)]]
+  speed <player> <studsPerSec|reset>   test-only riding speed (now and for later rides)
+  mount <player>                diagnose the rider's mount: position vs rider, welds, anchoring]]
 
 local function findPlayer(name: string?): Player?
 	if name == nil then
@@ -129,6 +130,60 @@ local function run(commandLine: string): string
 		end
 		local ok, reason = RunSessionService.DebugSetProgress(player, distance)
 		return if ok then `moved {player.Name} to {distance} studs` else `goto failed: {reason}`
+	elseif command == "mount" then
+		local lines = {}
+		local character = player.Character
+		local root = character and character:FindFirstChild("HumanoidRootPart")
+		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+		if root == nil or not root:IsA("BasePart") then
+			return "no character root"
+		end
+		table.insert(lines, `root position {root.Position}  anchored={root.Anchored}`)
+		if humanoid then
+			table.insert(lines, `humanoid rig={humanoid.RigType.Name} hipHeight={humanoid.HipHeight}`)
+		end
+		local mount = character:FindFirstChild("TestMount")
+		if mount == nil then
+			table.insert(lines, "no TestMount in the character")
+		else
+			table.insert(lines, `mount class={mount.ClassName} RiderHipHeight attr={tostring(mount:GetAttribute("RiderHipHeight"))}`)
+			if mount:IsA("Model") then
+				table.insert(lines, `mount pivot {mount:GetPivot().Position}  distance from root {string.format("%.1f", (mount:GetPivot().Position - root.Position).Magnitude)}`)
+				local seat = mount:FindFirstChild("Seat", true)
+				if seat and seat:IsA("Attachment") then
+					table.insert(lines, `seat world {seat.WorldPosition}  offset from root {seat.WorldPosition - root.Position}`)
+					table.insert(lines, `seat parent {seat.Parent and seat.Parent.Name}  local Position {seat.Position}  Orientation {seat.Orientation}`)
+				end
+			end
+			local parts, anchored, welds, activeWelds = 0, 0, 0, 0
+			local descendants = mount:GetDescendants()
+			if mount:IsA("BasePart") then
+				table.insert(descendants, mount)
+			end
+			for _, d in descendants do
+				if d:IsA("BasePart") then
+					parts += 1
+					if d.Anchored then
+						anchored += 1
+					end
+					table.insert(lines, `  part {d.Name} at {d.Position} (dist {string.format("%.1f", (d.Position - root.Position).Magnitude)})`)
+				elseif d:IsA("WeldConstraint") then
+					welds += 1
+					if d.Active then
+						activeWelds += 1
+					end
+				elseif d:IsA("JointInstance") or d:IsA("Constraint") then
+					table.insert(lines, `  other joint/constraint: {d.ClassName} {d:GetFullName()}`)
+				end
+			end
+			table.insert(lines, `parts={parts} anchored={anchored} weldConstraints={welds} active={activeWelds}`)
+		end
+		for _, item in game:GetService("Workspace"):GetDescendants() do
+			if item.Name == "TestHorse" and item:IsA("Model") then
+				table.insert(lines, `NOTE: a TestHorse model is also in Workspace: {item:GetFullName()} at {item:GetPivot().Position}`)
+			end
+		end
+		return table.concat(lines, "\n")
 	elseif command == "speed" then
 		local value = args[3]
 		local speed = if value == "reset" then nil else tonumber(value)

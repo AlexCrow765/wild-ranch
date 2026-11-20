@@ -471,3 +471,20 @@ that needs it fails with an `OPEN QUESTION` error. Remove a row once decided and
   (plot 120 × 120, pen 60 × 60, plot centres r = 195, plaza r = 120, runway 40 × 160, grass
   r = 275), adjustable in `HubConfig`; O5 pen anchored ~4 studs from the plot back, growing toward
   the entrance and sideways (max ≈ 112 × 104). New Phase 3B added; Stage 1 authorized.
+- 2026-11-20 – Riding controls & HUD (designer approved): PC steering keeps A/D **and** Left/Right
+  arrows; gamepad stick + D-pad; two hold buttons on mobile. Opposite directions held together
+  give zero steering (no most-recent-input priority); steering is always 0 when not riding
+  (`Shared/Rules/SteerInput`, tested). HUD shows the mount name ("Test Mount" placeholder until
+  Phase 8), stamina bar with low/critical colours, a run-status line, held-state mobile buttons;
+  the debug readout is Studio-only.
+- 2026-11-20 – Riding pose: Roblox's built-in sit animation (default `Animate.sit`) is the
+  temporary pose until a published Ride animation is set in `MountConfig.RideAnimationId`
+  (open). Pose, input and rider lift are cleared on every run end, respawn and death.
+- 2026-11-20 – Test horse mount (designer request): low-poly horse made in Blender
+  (`ASSETS/Mounts/TestHorse.blend` / `.fbx`, 728 triangles), imported in Studio and kept in
+  `ServerStorage.Mounts.TestHorse` with a `Seat` attachment on the saddle (Position 0, 0.175, 0).
+  The server clones it, aligns `Seat` with the rider (`Shared/Rules/MountSeat`) and welds it as a
+  visual-only mount; the client raises the Humanoid's HipHeight (R15) so the hooves reach the
+  ground and restores it afterwards. `MountConfig.TestMountSeatDrop = 1.5` (tuned in Studio).
+  A Seat far from its part is rejected (warning + grey-box block). The server cannot see client
+  animations, so the seat drop is tuned, not measured. Static model – no gallop animation yet.

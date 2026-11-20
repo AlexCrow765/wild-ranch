@@ -3,3 +3,5 @@
 *.png binary
 *.rbxl binary
 *.rbxm binary
+*.blend binary
+*.fbx binary
